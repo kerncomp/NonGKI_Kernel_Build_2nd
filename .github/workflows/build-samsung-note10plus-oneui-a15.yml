@@ -126,49 +126,6 @@ jobs:
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
 
-    
-      - name: 🚀 Apply Backport Patches
-        shell: bash
-        run: |
-          cd $GITHUB_WORKSPACE/device_kernel
-          
-          echo "[+] backport_patches.sh scripti aranıyor..."
-          
-          # 1. DİNAMİK ARAMA: Klasör iç içe geçmiş olsa bile dosyayı bulur
-          SCRIPT_PATH=$(find /tmp/Patches_Backup -name "backport_patches.sh" | head -n 1)
-          
-          if [ -z "$SCRIPT_PATH" ]; then
-              echo "[-] KRİTİK HATA: backport_patches.sh hiçbir yedek klasöründe bulunamadı!"
-              exit 1
-          fi
-          
-          # Dosyayı kernel dizinine kopyala
-          cp "$SCRIPT_PATH" ./
-          
-          # 2. CRLF DÜZELTMESİ (Görünmez Windows ^M karakterlerini siler)
-          sed -i 's/\r$//' backport_patches.sh
-          
-          # Çalıştırma yetkisi ver
-          chmod +x backport_patches.sh
-          
-          echo "[+] Script çalıştırılıyor..."
-          bash backport_patches.sh
-          
-          echo "[+] Backport yamaları başarıyla uygulandı!"
-          
-          # Dosyayı kernel dizinine kopyala
-          cp "$SCRIPT_PATH" ./
-          
-          # 2. CRLF DÜZELTMESİ (Görünmez Windows ^M karakterlerini siler)
-          sed -i 's/\r$//' backport_patches.sh
-          
-          # Çalıştırma yetkisi ver
-          chmod +x backport_patches.sh
-          
-          echo "[+] Script çalıştırılıyor..."
-          bash backport_patches.sh
-          
-          echo "[+] Backport yamaları başarıyla uygulandı!"
       - name: 🚀 Apply Custom Kernel Patches
         shell: bash
         run: |
