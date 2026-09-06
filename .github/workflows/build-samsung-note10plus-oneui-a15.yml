@@ -15,7 +15,7 @@ env:
   KERNEL_SOURCE : "https://github.com/maelmsss/exynos982x_kernel.git"
   KERNEL_BRANCH : "main"
 
-  CLANG_SOURCE : "https://raw.githubusercontent.com/Neutron-Toolchains/antman/main/antman"
+  CLANG_SOURCE : "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz"
   CLANG_BRANCH : ""
 
   GCC_GNU : false
@@ -66,7 +66,7 @@ env:
 
   REKERNEL_ENABLE: "false" # if u need Re:Kernel.
   DROIDSPACES_ENABLE: "false" # if u need Droidspaces or LXC/Docker.
-  NOMOUNT_ENABLE: "true" # if u need NoMount.
+  NOMOUNT_ENABLE: "false" # if u need NoMount.
 
   HOOK_METHOD: "syscall" # Manual hook method ->  syscall.
 
@@ -258,38 +258,7 @@ jobs:
           ' \;
           
           echo "[+] 4.14 Native Maple ve ek yamaları başarıyla entegre edildi!"
-      - name: ⚡ Apply Additional Optimization Patches (other_opt)
-        shell: bash
-        run: |
-          cd $GITHUB_WORKSPACE/device_kernel
           
-          echo "[+] Optimizasyon yamaları geçici olarak klonlanıyor..."
-          git clone --depth=1 https://github.com/fatalcoder524/kernel_patches_additional.git /tmp/opt_patches
-          
-          echo "[+] other_opt klasöründeki yamalar sırayla test edilip uygulanıyor..."
-          for patch_file in /tmp/opt_patches/other_opt/*.patch; do
-              echo "--------------------------------------------------------"
-              echo "[>] İşleniyor: $(basename "$patch_file")"
-              
-              # ZEKİ FİLTRE: Eğer yama cpufreq.c'yi değiştiriyorsa veya new_data içeriyorsa atla!
-              if grep -q "get_cpumask_min_limit" "$patch_file" || grep -q "cpufreq.c" "$patch_file"; then
-                  echo "[-] UYARI: $(basename "$patch_file") yaması 4.14 cpufreq API'si ile uyumsuz. Pas geçiliyor!"
-                  continue
-              fi
-              
-              # Windows/Linux satır sonu (CRLF) uyumsuzluklarını temizle
-              sed -i 's/\r$//' "$patch_file"
-              
-              # Yamayı uygula
-              patch -p1 < "$patch_file" || echo "[-] UYARI: Yama uygulanamadı, pas geçildi!"
-          done
-          echo "--------------------------------------------------------"
-          
-          echo "[+] Temizlik yapılıyor..."
-          rm -rf /tmp/opt_patches
-          find . -type f -name "*.rej" -delete
-          
-          echo "[+] Uyumlu optimizasyon yamaları başarıyla entegre edildi!"
       - name: 🚀 Enable FQ-CoDel (Network Scheduler)
         shell: bash
         run: |
@@ -370,7 +339,6 @@ jobs:
           fi
     
       - name: 🧩 Patch Kernel of NoMount (master branch, setup.sh)
-        if: env.NOMOUNT_ENABLE == 'true'
         shell: bash
         run: |
           set -x
@@ -403,23 +371,6 @@ jobs:
           cd $GITHUB_WORKSPACE/device_kernel
           DEFCONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           
-          echo "[+] RKP, Knox, TIMA ve DEFEX Güvenlik Önlemleri Kapatılıyor..."
-          sed -i 's/CONFIG_RKP_KDP=y/# CONFIG_RKP_KDP is not set/g' "$DEFCONFIG_FILE"
-          sed -i 's/CONFIG_RKP_CFP=y/# CONFIG_RKP_CFP is not set/g' "$DEFCONFIG_FILE"
-          sed -i 's/CONFIG_UH_RKP=y/# CONFIG_UH_RKP is not set/g' "$DEFCONFIG_FILE"
-          sed -i 's/CONFIG_PROCA=y/# CONFIG_PROCA is not set/g' "$DEFCONFIG_FILE"
-          sed -i 's/CONFIG_TIMA=y/# CONFIG_TIMA is not set/g' "$DEFCONFIG_FILE"
-          sed -i 's/CONFIG_KNOX_KAP=y/# CONFIG_KNOX_KAP is not set/g' "$DEFCONFIG_FILE"
-          sed -i 's/CONFIG_SECURITY_DSMSA=y/# CONFIG_SECURITY_DSMSA is not set/g' "$DEFCONFIG_FILE"
-          
-          echo "[+] Samsung Kısıtlamaları (Restrict & Defex) Kaldırılıyor..."
-          sed -i 's/CONFIG_SEC_DEFEX=y/# CONFIG_SEC_DEFEX is not set/g' "$DEFCONFIG_FILE"
-          sed -i 's/CONFIG_SECURITY_DEFEX=y/# CONFIG_SECURITY_DEFEX is not set/g' "$DEFCONFIG_FILE"
-          sed -i 's/CONFIG_SEC_RESTRICT=y/# CONFIG_SEC_RESTRICT is not set/g' "$DEFCONFIG_FILE"
-          sed -i 's/CONFIG_SEC_RESTRICT_SETUID=y/# CONFIG_SEC_RESTRICT_SETUID is not set/g' "$DEFCONFIG_FILE"
-          sed -i 's/CONFIG_SEC_RESTRICT_FORK=y/# CONFIG_SEC_RESTRICT_FORK is not set/g' "$DEFCONFIG_FILE"
-          sed -i 's/CONFIG_SEC_RESTRICT_ROOTING=y/# CONFIG_SEC_RESTRICT_ROOTING is not set/g' "$DEFCONFIG_FILE"
-          
           cat >> "$DEFCONFIG_FILE" << 'EOF'
           
           CONFIG_DEBUG_KERNEL=y
@@ -443,6 +394,7 @@ jobs:
           CONFIG_DEVFREQ_BOOST=y
           
           EOF
+          
       - name: 🔒 Patch Kernel of Baseband Guard
         uses: ./.github/workflows/patch-baseband-guard
 
