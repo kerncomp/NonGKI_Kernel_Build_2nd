@@ -12,7 +12,7 @@ env:
   CUSTOM_CMDS : "CLANG_TRIPLE=aarch64-linux-gnu-"
   EXTRA_CMDS : "LLVM=1 LLVM_IAS=1"
 
-  KERNEL_SOURCE : "https://github.com/maelmsss/exynos982x_kernel.git"
+  KERNEL_SOURCE : "https://github.com/maelmssss/9820_kernel.git"
   KERNEL_BRANCH : "main"
 
   CLANG_SOURCE : "https://raw.githubusercontent.com/Neutron-Toolchains/antman/main/antman"
@@ -24,6 +24,7 @@ env:
   GCC_32_SOURCE : ""
   GCC_32_BRANCH : ""
 
+
   DEFCONFIG_SOURCE: ""
   DEFCONFIG_NAME : "exynos9820_defconfig"
   DEFCONFIG_ORIGIN_IMAGE: ""
@@ -33,10 +34,11 @@ env:
   KERNELSU_BRANCH : ""
 
   KERNELSU_AUTO_GET : "true"
-  KERNELSU_AUTO_FORK : "resukisu" # xxksu, rsuntk , next, resukisu and sukisu
+  KERNELSU_AUTO_FORK : "xxksu" # xxksu, rsuntk , next, resukisu and sukisu
 
   SUSFS_ENABLE : true
   SUSFS_FIXED : true
+  SUSFS_TRY_UMOUNT : true
 
   AK3_SOURCE : "https://github.com/osm0sis/AnyKernel3.git"
   AK3_BRANCH : "master"
@@ -64,18 +66,18 @@ env:
 
   REKERNEL_ENABLE: "false" # if u need Re:Kernel.
   DROIDSPACES_ENABLE: "false" # if u need Droidspaces or LXC/Docker.
-  NOMOUNT_ENABLE: "false" # if u need NoMount.
+  NOMOUNT_ENABLE: "true" # if u need NoMount.
 
   HOOK_METHOD: "syscall" # Manual hook method ->  syscall.
 
-  KERNEL_PATCH: "false" # If your kernel version is <= 4.9, you have the option of enabling the patch to patch the kernel_write and kernel_read functions.
+  KERNEL_PATCH: "true" # If your kernel version is <= 4.9, you have the option of enabling the patch to patch the kernel_write and kernel_read functions.
 
-  KPM_ENABLE: "false" # Anyone devices.
+  KPM_ENABLE: "false" # Anyone devices. 
   KPM_INLINE: "false" # Only use it for SukiSU-Ultra.
   KPM_KPATCH_NEXT: "false" # If u want hook KPatch-Next in build step.
-  KPM_PATCH_SOURCE: "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/refs/heads/main/kpm/patch_linux" # If u want to use KPM Inline,so you need set patch exec file source -> raw.githubusercontent.com/Test/Test/patch .
+  KPM_PATCH_SOURCE: "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" # If u want to use KPM Inline,so you need set patch exec file source -> raw.githubusercontent.com/Test/Test/patch .
 
-  BASEBAND_GUARD_ENABLE: "false" #if u want prevent unauthorized writes to critical partitions/device nodes.
+  BASEBAND_GUARD_ENABLE: "true" #if u want prevent unauthorized writes to critical partitions/device nodes.
   BASEBAND_GUARD_BOOT: "false" #if u want to protect boot partition.
 
   GENERATE_DTB: "false" # if u kernel need DTB , but cannot auto generate it. (Only Anykernel3).
@@ -103,12 +105,390 @@ jobs:
       - name: ⏰ Checkout repository
         uses: actions/checkout@v6
 
+      - name: 🛡️ Backup Patches Directory
+        shell: bash
+        run: |
+          echo "[+] Patches klasörü güvenli bölgeye (/tmp/Patches_Backup) kopyalanıyor..."
+          cp -r $GITHUB_WORKSPACE/Patches /tmp/Patches_Backup
+          echo "[+] Yedekleme tamam. /tmp/Patches_Backup içeriği:"
+          ls -la /tmp/Patches_Backup
+      # ========================================
+
+      - name: 🔍 List Patches directory
+        shell: bash
+        run: |
+          ls -la $GITHUB_WORKSPACE/Patches/ || echo "Patches Workspace'de bulunamadı (Zaten yedekledik)"
+          echo "---"
+          find /tmp/Patches_Backup -maxdepth 2 -type f
       - name: ⌛️ Compilation environment preparation
         uses: ./.github/workflows/build-env
 
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
 
+    
+      - name: 🚀 Apply Backport Patches
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          echo "[+] backport_patches.sh scripti aranıyor..."
+          
+          # 1. DİNAMİK ARAMA: Klasör iç içe geçmiş olsa bile dosyayı bulur
+          SCRIPT_PATH=$(find /tmp/Patches_Backup -name "backport_patches.sh" | head -n 1)
+          
+          if [ -z "$SCRIPT_PATH" ]; then
+              echo "[-] KRİTİK HATA: backport_patches.sh hiçbir yedek klasöründe bulunamadı!"
+              exit 1
+          fi
+          
+          # Dosyayı kernel dizinine kopyala
+          cp "$SCRIPT_PATH" ./
+          
+          # 2. CRLF DÜZELTMESİ (Görünmez Windows ^M karakterlerini siler)
+          sed -i 's/\r$//' backport_patches.sh
+          
+          # Çalıştırma yetkisi ver
+          chmod +x backport_patches.sh
+          
+          echo "[+] Script çalıştırılıyor..."
+          bash backport_patches.sh
+          
+          echo "[+] Backport yamaları başarıyla uygulandı!"
+          
+          # Dosyayı kernel dizinine kopyala
+          cp "$SCRIPT_PATH" ./
+          
+          # 2. CRLF DÜZELTMESİ (Görünmez Windows ^M karakterlerini siler)
+          sed -i 's/\r$//' backport_patches.sh
+          
+          # Çalıştırma yetkisi ver
+          chmod +x backport_patches.sh
+          
+          echo "[+] Script çalıştırılıyor..."
+          bash backport_patches.sh
+          
+          echo "[+] Backport yamaları başarıyla uygulandı!"
+      - name: 🚀 Apply Custom Kernel Patches
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          echo "[+] Özel yamalar (patch) sırayla çekilip uygulanıyor..."
+          REPO_URL="https://github.com/sidex15/android_kernel_lge_sm8150/commit"
+          
+          # Yalnızca Samsung çekirdeğinde OLMAYAN ve %100 uyumlu 5 yama bırakıldı.
+          COMMITS=(
+            "01baff0ae3abea5027d0cd5b827dab46465f0373"
+            "ae6308ea9131a515aaac515964faa3bb17a60d34"
+            "f6bda7697e55335a49754ec92f637ace2ba4c84b"
+            "261e023dc6926be63327aeef4fa1c9c30498bd5d"
+            "606ac1e867c09d73f3bf3e942409051e438cacd6"
+          )
+          
+          for COMMIT in "${COMMITS[@]}"; do
+              echo "[+] İşleniyor: $COMMIT"
+              curl -sL "$REPO_URL/$COMMIT.patch" -o "$COMMIT.patch"
+              sed -i 's/\r$//' "$COMMIT.patch"
+              
+              # DİKKAT: -N parametresi eklendi! (Asla kodları geri alma/silme demek)
+              patch -t -N -p1 --fuzz=3 < "$COMMIT.patch" || true
+              
+              if find . -name "*.rej" | grep -q .; then
+                  echo "[-] KRİTİK HATA: $COMMIT yaması kodlara uymadı!"
+                  echo "[-] Reddedilen kısımlar aşağıdadır:"
+                  find . -name "*.rej" -exec cat {} \;
+                  exit 1
+              fi
+          done
+          
+          echo "[+] Tüm yamalar kusursuz şekilde işlendi!"
+          
+      - name: 🛠️ Fix sysctl.c Undeclared Identifier
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          echo "[+] sysctl.c içindeki eksik 'three' değişkeni onarılıyor..."
+          
+          # Sadece asıl tablonun tam eşleşmesini bularak değişkeni TEK BİR KERE ekler
+          sed -i '/static struct ctl_table kern_table\[\] = {/i static int three = 3;' kernel/sysctl.c
+          
+          echo "[+] Değişken tekil olarak başarıyla enjekte edildi."
+      - name: ⚖️ Apply & Fix SBalance Patch (4.14 Backport)
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          echo "[+] SBalance yaması güvenli yedek alanında (/tmp/Patches_Backup) aranıyor..."
+          
+          # Dosyayı senin güvenli yedeğinden otomatik olarak bulup yolunu alır
+          PATCH_FILE=$(find /tmp/Patches_Backup -name "sbalance.patch" 2>/dev/null | head -n 1)
+          
+          if [ -z "$PATCH_FILE" ]; then
+              echo "[-] KRİTİK HATA: sbalance.patch yedek klasöründe bile bulunamadı!"
+              exit 1
+          fi
+          
+          echo "[+] Yama bulundu: $PATCH_FILE"
+          echo "[+] CRLF temizliği yapılıyor..."
+          sed -i 's/\r$//' "$PATCH_FILE"
+          
+          echo "[+] Yama çekirdeğe işleniyor..."
+          patch -p1 < "$PATCH_FILE" || true
+          
+          echo "[+] Dosya sisteminin güncellenmesi için 3 saniye bekleniyor..."
+          sleep 3
+          
+          # Güvenli Makefile Onarımı
+          echo "[+] sbalance.o Makefile'a ekleniyor..."
+          if ! grep -q "sbalance.o" kernel/irq/Makefile; then
+              echo "obj-y += sbalance.o" >> kernel/irq/Makefile
+          fi
+          rm -f kernel/irq/Makefile.rej
+          
+          # sbalance.c dosyası var mı DÖNGÜSÜ (Garantili kontrol)
+          if [ ! -f "kernel/irq/sbalance.c" ]; then
+              echo "[-] sbalance.c hala bulunamadı! Yama bozuk olabilir veya dosya oluşturulamadı."
+              cat kernel/irq/*.rej || true
+              exit 1
+          fi
+          
+          echo "[+] SBalance C kodları 4.14 mimarisi için onarılıyor..."
+          
+          # 1. Kütüphane eklentisi (Sadece BİR KERE ekliyoruz)
+          sed -i '1s/^/#include <linux\/cpufreq.h>\n/' kernel/irq/sbalance.c
+          
+          # 2. arch_scale_cpu_capacity uyarlaması
+          sed -i 's/arch_scale_cpu_capacity(cpu)/arch_scale_cpu_capacity(NULL, cpu)/g' kernel/irq/sbalance.c
+          
+          # 3. Kapanış parantezleri
+          echo -e "\n\t}\n}" >> kernel/irq/sbalance.c
+          
+          echo "[+] SBalance yaması ve Backport onarımı kusursuz tamamlandı!"
+      
+      - name: 🚀 Apply Native 4.14 Maple I/O Scheduler & Fixes
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          echo "[+] 4.14 Uyumlu Maple I/O ana yaması çekiliyor..."
+          curl -sL "https://github.com/manipvlator/los_kernel_xiaomi_sm6150/commit/5f39c5f68f9a8890cbf7639e35a3edb6f873bd65.patch" -o maple_414_base.patch
+          
+          echo "[+] Maple I/O ek düzeltme yamaları (Fixes) çekiliyor..."
+          curl -sL "https://github.com/manipvlator/los_kernel_xiaomi_sm6150/commit/a181d8276b765c481b7643830fd49153da7d28b2.patch" -o maple_414_fix1.patch
+          curl -sL "https://github.com/manipvlator/los_kernel_xiaomi_sm6150/commit/4aaec6194aa556a473bf1cc82afde27825e16dd1.patch" -o maple_414_fix2.patch
+          
+          echo "[+] CRLF temizliği yapılıyor..."
+          sed -i 's/\r$//' maple_414_base.patch maple_414_fix1.patch maple_414_fix2.patch
+          
+          echo "[+] Yamalar sırayla (Ana Yama -> Düzeltme 1 -> Düzeltme 2) uygulanıyor..."
+          patch -p1 < maple_414_base.patch || true
+          patch -p1 < maple_414_fix1.patch || true
+          patch -p1 < maple_414_fix2.patch || true
+          
+          echo "[+] Güvenlik önlemleri (Makefile çakışmaları için)..."
+          if ! grep -q "maple-iosched.o" block/Makefile; then
+              echo "" >> block/Makefile
+              echo "obj-\$(CONFIG_IOSCHED_MAPLE) += maple-iosched.o" >> block/Makefile
+          fi
+          
+          
+          echo "[+] Maple, Defconfig dosyalarına işleniyor ve varsayılan yapılıyor!"
+          find arch/arm64/configs -type f -name "*defconfig" -exec sh -c '
+              echo "" >> "{}"
+              echo "CONFIG_IOSCHED_MAPLE=y" >> "{}"
+              sed -i "s/CONFIG_DEFAULT_IOSCHED=.*/CONFIG_DEFAULT_IOSCHED=\"maple\"/g" "{}"
+          ' \;
+          
+          echo "[+] 4.14 Native Maple ve ek yamaları başarıyla entegre edildi!"
+      - name: ⚡ Apply Additional Optimization Patches (other_opt)
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          echo "[+] Optimizasyon yamaları geçici olarak klonlanıyor..."
+          git clone --depth=1 https://github.com/fatalcoder524/kernel_patches_additional.git /tmp/opt_patches
+          
+          echo "[+] other_opt klasöründeki yamalar sırayla test edilip uygulanıyor..."
+          for patch_file in /tmp/opt_patches/other_opt/*.patch; do
+              echo "--------------------------------------------------------"
+              echo "[>] İşleniyor: $(basename "$patch_file")"
+              
+              # ZEKİ FİLTRE: Eğer yama cpufreq.c'yi değiştiriyorsa veya new_data içeriyorsa atla!
+              if grep -q "get_cpumask_min_limit" "$patch_file" || grep -q "cpufreq.c" "$patch_file"; then
+                  echo "[-] UYARI: $(basename "$patch_file") yaması 4.14 cpufreq API'si ile uyumsuz. Pas geçiliyor!"
+                  continue
+              fi
+              
+              # Windows/Linux satır sonu (CRLF) uyumsuzluklarını temizle
+              sed -i 's/\r$//' "$patch_file"
+              
+              # Yamayı uygula
+              patch -p1 < "$patch_file" || echo "[-] UYARI: Yama uygulanamadı, pas geçildi!"
+          done
+          echo "--------------------------------------------------------"
+          
+          echo "[+] Temizlik yapılıyor..."
+          rm -rf /tmp/opt_patches
+          find . -type f -name "*.rej" -delete
+          
+          echo "[+] Uyumlu optimizasyon yamaları başarıyla entegre edildi!"
+      - name: 🚀 Enable FQ-CoDel (Network Scheduler)
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          echo "[+] FQ-CoDel için QoS Ana Şalterleri açılıyor ve ayarlanıyor..."
+          find arch/arm64/configs -type f -name "*defconfig" -exec sh -c '
+              echo "" >> "{}"
+              
+              # 1. QoS ve Ağ Zamanlama Ana Şalterlerini Açıyoruz (ZORUNLU BAĞIMLILIK)
+              echo "CONFIG_NET_SCHED=y" >> "{}"
+              
+              # 2. FQ-CoDel Sürücüsünü Aktif Ediyoruz
+              echo "CONFIG_NET_SCH_FQ_CODEL=y" >> "{}"
+              echo "CONFIG_DEFAULT_FQ_CODEL=y" >> "{}"
+              
+              # 3. Varsayılan Zamanlayıcıyı fq_codel Olarak Değiştiriyoruz
+              sed -i "s/CONFIG_DEFAULT_NET_SCH=.*/CONFIG_DEFAULT_NET_SCH=\"fq_codel\"/g" "{}"
+              
+              # Eğer CONFIG_DEFAULT_NET_SCH satırı orijinal dosyada hiç yoksa zorla ekliyoruz
+              if ! grep -q "CONFIG_DEFAULT_NET_SCH=\"fq_codel\"" "{}"; then
+                  echo "CONFIG_DEFAULT_NET_SCH=\"fq_codel\"" >> "{}"
+              fi
+          ' \;
+          
+          echo "[+] FQ-CoDel başarıyla defconfig'e işlendi!"    
+      - name: 🚀 Set CUBIC as Default TCP Congestion Control
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          echo "[+] TCP CUBIC Algoritması varsayılan olarak ayarlanıyor..."
+          find arch/arm64/configs -type f -name "*defconfig" -exec sh -c '
+              # Olası tekrarları ve çakışmaları önlemek için eski ayarları temizliyoruz
+              sed -i "/CONFIG_TCP_CONG_CUBIC/d" "{}"
+              sed -i "/CONFIG_DEFAULT_CUBIC/d" "{}"
+              sed -i "/CONFIG_DEFAULT_TCP_CONG/d" "{}"
+              
+              echo "" >> "{}"
+              # CUBIC modülünü çekirdeğe gömülü derlenmesi için aktif ediyoruz
+              echo "CONFIG_TCP_CONG_CUBIC=y" >> "{}"
+              
+              # CUBIC algoritmasını varsayılan olarak belirliyoruz
+              echo "CONFIG_DEFAULT_CUBIC=y" >> "{}"
+              echo "CONFIG_DEFAULT_TCP_CONG=\"cubic\"" >> "{}"
+          ' \;
+          
+          echo "[+] TCP CUBIC başarıyla defconfig'e işlendi!"
+          
+      - name: 🪝 Patch Kernel of SUSFS
+        uses: ./.github/workflows/patch-susfs
+
+      - name: 🔗 Patch for no-kprobe
+        uses: ./.github/workflows/patch-no-kprobe
+
+      - name: 🔒 Apply SuSFS memfd Backport Patch
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          echo "[+] SuSFS için memfd yaması çekiliyor..."
+          curl -sL "https://github.com/fatalcoder524/kernel_patches_additional/commit/598b8b81224ce477cfbc1dbf475a6e6549b83452.patch" -o sus_memfd.patch
+          
+          echo "[+] CRLF (Windows satır sonu) formatı temizleniyor..."
+          sed -i 's/\r$//' sus_memfd.patch
+          
+          echo "[+] memfd yaması kernela işleniyor..."
+          # -p1 standart yoldur, eğer patlarsa -p2 ile bir alt dizini dener.
+          patch -p1 --no-backup-if-mismatch < sus_memfd.patch || patch -p2 < sus_memfd.patch || true
+          
+          echo "[+] Hata kontrolü yapılıyor (.rej dosyaları)..."
+          # Eğer patch uyuşmazlıktan dolayı bazı satırları reddederse, neyi reddettiğini loglarda gösterir.
+          if ls *.rej 1> /dev/null 2>&1; then
+              echo "[-] DİKKAT: Bazı satırlar yamalanamadı! (Reddedilen dosyalar aşağıdadır):"
+              find . -name "*.rej" -exec cat {} \;
+          else
+              echo "[+] memfd yaması kusursuz uygulandı!"
+          fi
+    
+      - name: 🧩 Patch Kernel of NoMount (master branch, setup.sh)
+        if: env.NOMOUNT_ENABLE == 'true'
+        shell: bash
+        run: |
+          set -x
+          cd $GITHUB_WORKSPACE/device_kernel
+          # Resmi setup.sh script'ini master branch'ten çek ve çalıştır
+          curl -sSL https://raw.githubusercontent.com/maxsteeel/nomount/master/kernel/setup.sh -o /tmp/nomount_setup.sh
+          chmod +x /tmp/nomount_setup.sh
+          sh /tmp/nomount_setup.sh
+          # Defconfig'e NoMount seçeneğini ekle
+          echo "CONFIG_NOMOUNT=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          echo "[+] NoMount entegrasyonu tamamlandı (setup.sh master branch ile)."
+          
+      - name: 🧰 Patch Kernel of Re:Kernel
+        if: env.REKERNEL_ENABLE == 'true'
+        uses: ./.github/workflows/patch-rekernel
+
+      - name: 🛠️ Fix Re-Kernel TRANSACTION conflict
+        if: env.REKERNEL_ENABLE == 'true'
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          sed -i 's/\bTRANSACTION\b/REKERNEL_TRANSACTION/g' include/net/rekernel.h
+          
+      - name: 💿 Patch Kernel of Droidspaces
+        uses: ./.github/workflows/patch-droidspaces
+           
+      - name: ➕ Add Non-GKI configs to defconfig
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          DEFCONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+          
+          echo "[+] RKP, Knox, TIMA ve DEFEX Güvenlik Önlemleri Kapatılıyor..."
+          sed -i 's/CONFIG_RKP_KDP=y/# CONFIG_RKP_KDP is not set/g' "$DEFCONFIG_FILE"
+          sed -i 's/CONFIG_RKP_CFP=y/# CONFIG_RKP_CFP is not set/g' "$DEFCONFIG_FILE"
+          sed -i 's/CONFIG_UH_RKP=y/# CONFIG_UH_RKP is not set/g' "$DEFCONFIG_FILE"
+          sed -i 's/CONFIG_PROCA=y/# CONFIG_PROCA is not set/g' "$DEFCONFIG_FILE"
+          sed -i 's/CONFIG_TIMA=y/# CONFIG_TIMA is not set/g' "$DEFCONFIG_FILE"
+          sed -i 's/CONFIG_KNOX_KAP=y/# CONFIG_KNOX_KAP is not set/g' "$DEFCONFIG_FILE"
+          sed -i 's/CONFIG_SECURITY_DSMSA=y/# CONFIG_SECURITY_DSMSA is not set/g' "$DEFCONFIG_FILE"
+          
+          echo "[+] Samsung Kısıtlamaları (Restrict & Defex) Kaldırılıyor..."
+          sed -i 's/CONFIG_SEC_DEFEX=y/# CONFIG_SEC_DEFEX is not set/g' "$DEFCONFIG_FILE"
+          sed -i 's/CONFIG_SECURITY_DEFEX=y/# CONFIG_SECURITY_DEFEX is not set/g' "$DEFCONFIG_FILE"
+          sed -i 's/CONFIG_SEC_RESTRICT=y/# CONFIG_SEC_RESTRICT is not set/g' "$DEFCONFIG_FILE"
+          sed -i 's/CONFIG_SEC_RESTRICT_SETUID=y/# CONFIG_SEC_RESTRICT_SETUID is not set/g' "$DEFCONFIG_FILE"
+          sed -i 's/CONFIG_SEC_RESTRICT_FORK=y/# CONFIG_SEC_RESTRICT_FORK is not set/g' "$DEFCONFIG_FILE"
+          sed -i 's/CONFIG_SEC_RESTRICT_ROOTING=y/# CONFIG_SEC_RESTRICT_ROOTING is not set/g' "$DEFCONFIG_FILE"
+          
+          cat >> "$DEFCONFIG_FILE" << 'EOF'
+          
+          CONFIG_DEBUG_KERNEL=y
+          CONFIG_KALLSYMS=y
+          CONFIG_KALLSYMS_ALL=y
+          CONFIG_IRQ_SBALANCE=y
+          CONFIG_SBALANCE_EXCLUDE_CPUS="3,6,7"
+          CONFIG_IRQ_SBALANCE_POLL_MSEC=10000
+          CONFIG_SCHED_BORE=y
+          CONFIG_UCLAMP_TASK=y
+          CONFIG_UCLAMP_BUCKETS_COUNT=5
+          CONFIG_UCLAMP_TASK_GROUP=y
+          CONFIG_LITTLE_CPU_MASK=15
+          CONFIG_BIG_CPU_MASK=112
+          CONFIG_PRIME_CPU_MASK=128
+          CONFIG_DYNAMIC_FSYNC=y
+          CONFIG_DRM_MSM_KCAL_CTRL=y
+          CONFIG_IRQ_WORK=y
+          CONFIG_BUILDTIME_EXTABLE_SORT=y
+          CONFIG_THREAD_INFO_IN_TASK=y
+          CONFIG_DEVFREQ_BOOST=y
+          
+          EOF
+      - name: 🔒 Patch Kernel of Baseband Guard
+        uses: ./.github/workflows/patch-baseband-guard
+        
       - name: 🛠️ Fix SuSFS Linker Error (kallsyms)
         shell: bash
         run: |
@@ -139,37 +519,50 @@ jobs:
           mv kallsyms_fix.c kernel/kallsyms.c
           
           echo "[+] Linker yaması başarıyla en üste uygulandı!"
-
-      - name: 🪝 Patch Kernel of SUSFS
-        uses: ./.github/workflows/patch-susfs
-
-      - name: 🔗 Patch for no-kprobe
-        uses: ./.github/workflows/patch-no-kprobe
-
-      - name: 🪛 Extra Kernel Options
-        run: |
-          # Only ${{ env.DEVICE_NAME }} use it.
-          cd $GITHUB_WORKSPACE/device_kernel
-          # Nothing
-
-      - name: 🧰 Patch Kernel of Re:Kernel
-        uses: ./.github/workflows/patch-rekernel
-
-      - name: 💿 Patch Kernel of Droidspaces
-        uses: ./.github/workflows/patch-droidspaces
-
-      - name: 🔒 Patch Kernel of Baseband Guard
-        uses: ./.github/workflows/patch-baseband-guard
-
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
-
+          
+      - name: 🧷 Setup KPatch-Next tools
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          KPATCH_VER=$(curl -s https://api.github.com/repos/KernelSU-Next/KPatch-Next/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
+          echo "[+] KPatch-Next version: $KPATCH_VER"
+          echo "KPATCH_VER=$KPATCH_VER" >> $GITHUB_ENV
+          curl -Lo kptools https://github.com/KernelSU-Next/KPatch-Next/releases/download/${KPATCH_VER}/kptools-linux
+          curl -Lo kpimg https://github.com/KernelSU-Next/KPatch-Next/releases/download/${KPATCH_VER}/kpimg-linux
+          curl -Lo kpatch-android https://github.com/KernelSU-Next/KPatch-Next/releases/download/${KPATCH_VER}/kpatch-android
+          chmod +x kptools kpimg kpatch-android
+          ./kptools --version || true
+      - name: 🩹 Patch Kernel Image with KPatch-Next
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          IMAGE=out/arch/arm64/boot/Image
+          PATCHED_IMAGE=out/arch/arm64/boot/Image.kp
+          if [ ! -f "$IMAGE" ]; then
+            echo "[-] Kernel Image bulunamadı ($IMAGE), KPatch adımı atlanıyor."
+            exit 0
+          fi
+          ./kptools -i "$IMAGE" -l || true
+          ./kptools -p -i "$IMAGE" -k ./kpimg -o "$PATCHED_IMAGE"
+          echo "KPATCH_PATCHED=true" >> $GITHUB_ENV
+          echo "[+] Kernel Image KPatch-Next ile yamalandı: $PATCHED_IMAGE"
+      - name: 📝 Save build metadata
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          mkdir -p build/out/meta
+          {
+            echo "KPatch-Next Version: $KPATCH_VER"
+          } > build/out/meta/build-info.txt
+          echo "[+] build-info.txt oluşturuldu."
+          
       - name: ❗ Samsung Kernel Pack Process
         shell: bash
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-
-          # Var
+          
           TIME=$(date +"%Y%m%d%H%M%S")
           KERNEL_PATH=build/out/d2s/Image
           KERNEL_OFFSET=0x00008000
@@ -180,33 +573,50 @@ jobs:
           CMDLINE='loop.max_part=7'
           HASHTYPE=sha1
           HEADER_VERSION=1
-          OS_PATCH_LEVEL=2025-01
-          OS_VERSION=14.0.0
+          OS_PATCH_LEVEL=2025-08
+          OS_VERSION=16.0.0
           PAGESIZE=2048
           RAMDISK=build/out/d2s/ramdisk.cpio.gz
           OUTPUT_FILE=build/out/d2s/boot.img
           BOARD=SRPSC14B009KU
-
+          
           mkdir -p build/out/d2s/zip/files
           mkdir -p build/out/d2s/zip/META-INF/com/google/android
-
-          cp -f out/arch/arm64/boot/Image build/out/d2s/Image
-
+          
+          # KPatch-Next ile yamalanmış Image varsa onu kullan, yoksa orijinal Image'i kullan
+          if [ -f out/arch/arm64/boot/Image.kp ]; then
+            cp -f out/arch/arm64/boot/Image.kp build/out/d2s/Image
+            echo "[+] KPatch-Next ile yamalanmış kernel image kullanılıyor."
+          else
+            cp -f out/arch/arm64/boot/Image build/out/d2s/Image
+          fi
+          
           ./toolchain/mkdtimg cfg_create build/out/d2s/dtb.img build/dtconfigs/exynos9825.cfg -d out/arch/arm64/boot/dts/exynos
           ./toolchain/mkdtimg cfg_create build/out/d2s/dtbo.img build/dtconfigs/d2s.cfg -d out/arch/arm64/boot/dts/samsung
-
+          
           pushd build/ramdisk > /dev/null
           find . ! -name . | LC_ALL=C sort | cpio -o -H newc -R root:root | gzip > ../out/d2s/ramdisk.cpio.gz || abort
           popd > /dev/null
-
+          
           ./toolchain/mkbootimg --base $BASE --board $BOARD --cmdline "$CMDLINE" --hashtype $HASHTYPE --header_version $HEADER_VERSION --kernel $KERNEL_PATH --kernel_offset $KERNEL_OFFSET --os_patch_level $OS_PATCH_LEVEL --os_version $OS_VERSION --pagesize $PAGESIZE --ramdisk $RAMDISK --ramdisk_offset $RAMDISK_OFFSET --second_offset $SECOND_OFFSET --tags_offset $TAGS_OFFSET -o $OUTPUT_FILE
-
+          
           cp build/out/d2s/boot.img build/out/d2s/zip/files/boot.img
           cp build/out/d2s/dtb.img build/out/d2s/zip/files/dtb.img
           cp build/out/d2s/dtbo.img build/out/d2s/zip/files/dtbo.img
           cp build/update-binary build/out/d2s/zip/META-INF/com/google/android/update-binary
           cp build/updater-script build/out/d2s/zip/META-INF/com/google/android/updater-script
-
+          
+          # KPatch-Next kullanıldıysa kpatch-android aracını da pakete ekle
+          if [ -f kpatch-android ]; then
+            cp kpatch-android build/out/d2s/zip/files/kpatch-android
+          fi
+          
+          # KPatch-Next build metadata dosyasını zip'in köküne ekle
+          if [ -f build/out/meta/build-info.txt ]; then
+            cp build/out/meta/build-info.txt build/out/d2s/zip/build-info.txt
+            echo "[+] build-info.txt zip paketine eklendi."
+          fi
+          
           mkdir tmp
           cp -rp ./build/out/d2s/zip/* tmp
           cd tmp
@@ -214,8 +624,6 @@ jobs:
           cd ..
           cp -fp tmp/tmp.zip ${{ env.DEVICE_CODENAME }}-${{ env.ROM_TEXT }}-$TIME-${{ env.PACK_METHOD }}.zip
           rm -rf tmp
-
           echo "PACK_NAME=${{ env.DEVICE_CODENAME }}-${{ env.ROM_TEXT }}-$TIME-${{ env.PACK_METHOD }}.zip" >> $GITHUB_ENV
-
       - name: ✏️ Upload Artifacts
         uses: ./.github/workflows/upload-files
