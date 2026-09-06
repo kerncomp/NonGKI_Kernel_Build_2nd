@@ -447,11 +447,12 @@ jobs:
         uses: ./.github/workflows/patch-baseband-guard
 
       - name: Apply SuSFS Try Umount Patch
+        working-directory: device_kernel
         run: |
-         echo "SuSFS yaması indiriliyor ve uygulanıyor..."
-         curl -LSs "https://raw.githubusercontent.com/midori01/gki_ksu_workflow/refs/heads/main/.github/patches/55_try_umount_for_susfs.patch" -o susfs_umount.patch
-         patch -p1 < susfs_umount.patch
-         rm susfs_umount.patch
+          echo "SuSFS yaması indiriliyor ve uygulanıyor..."
+          curl -LSs "https://raw.githubusercontent.com/midori01/gki_ksu_workflow/refs/heads/main/.github/patches/55_try_umount_for_susfs.patch" -o susfs_umount.patch
+          patch -p1 < susfs_umount.patch
+          rm susfs_umount.patch
         
       - name: 🛠️ Fix SuSFS Linker Error (kallsyms)
         shell: bash
