@@ -128,12 +128,17 @@ runs:
                 KERNELSU_NAME="KernelSU"
                 KERNELSU_ORIGIN_BRANCH="master"
                 if [[ "${{ env.SUSFS_ENABLE }}" == "true" ]]; then
-                    echo "[-] ${{ env.KERNELSU_AUTO_FORK }} doesn't support SuSFS! "
-                    false
+                    KERNELSU_BRANCH="master"
                 else
                     KERNELSU_BRANCH="master"
                 fi
 
+            else
+                echo "[-] Please input vaild fork name!"
+                false
+
+            fi
+            
             elif [[ "${{ env.KERNELSU_AUTO_FORK }}" == "rsuntk" ]]; then
                 KERNELSU_AUTHOR="rsuntk"
                 KERNELSU_NAME="KernelSU"
