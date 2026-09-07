@@ -138,6 +138,7 @@ runs:
                 false
 
             fi
+          } 
             
             elif [[ "${{ env.KERNELSU_AUTO_FORK }}" == "rsuntk" ]]; then
                 KERNELSU_AUTHOR="rsuntk"
