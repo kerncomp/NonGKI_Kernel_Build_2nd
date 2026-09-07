@@ -102,7 +102,7 @@ jobs:
           git push --tags
 
           # Get KernelSU version
-          git clone -b xx https://github.com/midori01/KernelSU.git KernelSU-xxksu
+          git clone -b master https://github.com/backslashxx/KernelSU.git KernelSU-xxksu
           KSU_XXKSU_VERSION=$(cd KernelSU-xxksu && expr $(/usr/bin/git rev-list --count HEAD) + 30000 - 96)
           git clone -b main https://github.com/rsuntk/KernelSU.git KernelSU-rsuntk
           KSU_RSUNTK_VERSION=$(cd KernelSU-rsuntk && expr $(/usr/bin/git rev-list --count HEAD) + 10200)
@@ -111,7 +111,7 @@ jobs:
           git clone -b legacy https://github.com/KernelSU-Next/KernelSU-Next.git KernelSU-Next
           KSU_NEXT_VERSION=$(cd KernelSU-Next && expr $(/usr/bin/git rev-list --count HEAD) + 10200)
           git clone -b main https://github.com/ReSukiSU/ReSukiSU.git KernelSU-ReSukiSU
-          KSU_RESUKISU_VERSION=$(cd KernelSU-ReSukiSU && expr $(/usr/bin/git rev-list --count HEAD) + 10200)
+          KSU_RESUKISU_VERSION=$(cd KernelSU-ReSukiSU && expr $(/usr/bin/git rev-list --count HEAD) + 30700)
 
           # Input release note
           echo "RELEASE_NOTES<<EOF" >> $GITHUB_ENV
