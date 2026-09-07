@@ -249,6 +249,23 @@ runs:
 
           fi
 
+      - name: xxksu add SuSFS
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel/KernelSU
+
+          if [[ "${{ env.KERNELSU_SOURCE }}" == *backslashxx* ]] || [[ "${{ env.KERNELSU_AUTO_FORK }}" == "xxksu" ]]; then
+            if [[ "${{ env.SUSFS_ENABLE }}" == "true" ]]; then
+              patch -p1 < <(curl -sL "https://github.com/midori01/KernelSU/commit/xx.patch") || true
+
+              echo "[+] xxksu susfs applied."
+            fi
+            
+          else
+            echo "[-] Your KernelSU Fork needn't it, Skipped."
+
+          fi
+
       - name: KPM Function Support
         if: env.KPM_ENABLE == 'true'
         shell: bash
@@ -335,11 +352,6 @@ runs:
                 echo "CONFIG_KSU_MANUAL_HOOK=y" >> ./arch/${{ env.KERNEL_ARCH }}/configs/${{ env.DEFCONFIG_NAME }}
 
             fi
-          fi
-
-          if [[ "${{ env.KERNELSU_SOURCE }}" == *blackslashxx* ]] || [[ "${{ env.KERNELSU_AUTO_FORK }}" == "xxksu" ]]; then
-            echo "CONFIG_KSU_KPROBES_KSUD=n" >> ./arch/${{ env.KERNEL_ARCH }}/configs/${{ env.DEFCONFIG_NAME }}
-
           fi
 
           if [[ "${{ env.KERNELSU_SOURCE }}" == *SukiSU* ]] || [[ "${{ env.KERNELSU_AUTO_FORK }}" == "sukisu" ]] || [[ "${{ env.KERNELSU_SOURCE }}" == *ReSukiSU* ]] || [[ "${{ env.KERNELSU_AUTO_FORK }}" == "resukisu" ]]; then
