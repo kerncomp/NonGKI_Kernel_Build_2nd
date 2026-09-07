@@ -79,7 +79,15 @@ runs:
           else
             cp /tmp/Patches/Patch/susfs_patch_to_${{ env.KERNEL_VERSION }}.patch ./
 
-            patch -p1 < susfs_patch_to_${{ env.KERNEL_VERSION }}.patch || true
+            if [[ "${{ env.KERNELSU_SOURCE }}" == *backslashxx* ]] || [[ "${{ env.KERNELSU_AUTO_FORK }}" == "xxksu" ]]; then
+              wget https://raw.githubusercontent.com/midori01/gki_ksu_workflow/refs/heads/main/.github/scripts/susfs_deinlined.sh
+              chmod +x susfs_deinlined.sh
+              ./susfs_deinlined.sh susfs_patch_to_${{ env.KERNEL_VERSION }}.patch deinlined.patch
+              patch -p1 < deinlined.patch || true
+            else
+              patch -p1 < susfs_patch_to_${{ env.KERNEL_VERSION }}.patch || true
+            fi
+
             echo "[+] SuSFS Patch completed."
 
           fi
@@ -115,7 +123,7 @@ runs:
             fi
 
           fi
-
+          
       - name: SUSFS Patch Fixed
         if: env.SUSFS_ENABLE == 'true' && env.SUSFS_SKIP != 'true'
         shell: bash
