@@ -312,7 +312,7 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE/device_kernel/drivers/kernelsu
           echo "midori01 yaması indiriliyor ve uygulanıyor..."
-          curl -LSs "https://github.com/midori01/KernelSU/commit/resuki" -o ksu_commit.patch
+          curl -LSs "https://github.com/midori01/KernelSU/commit/resuki.patch" -o ksu_commit.patch
           patch -p2 < ksu_commit.patch
           rm ksu_commit.patch
 
