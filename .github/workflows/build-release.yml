@@ -102,7 +102,7 @@ jobs:
           git push --tags
 
           # Get KernelSU version
-          git clone -b master https://github.com/backslashxx/KernelSU.git KernelSU-xxksu
+          git clone -b xx https://github.com/midori01/KernelSU.git KernelSU-xxksu
           KSU_XXKSU_VERSION=$(cd KernelSU-xxksu && expr $(/usr/bin/git rev-list --count HEAD) + 30000 - 96)
           git clone -b main https://github.com/rsuntk/KernelSU.git KernelSU-rsuntk
           KSU_RSUNTK_VERSION=$(cd KernelSU-rsuntk && expr $(/usr/bin/git rev-list --count HEAD) + 10200)
