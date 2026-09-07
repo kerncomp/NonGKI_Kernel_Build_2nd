@@ -100,6 +100,9 @@ jobs:
       CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
       CCACHE_NOHASHDIR: "true"
       CCACHE_HARDLINK: "true"
+      KBUILD_BUILD_TIMESTAMP: "Thu Mar 2 09:32:04 KST 2023"
+      KBUILD_BUILD_USER: "builder"
+      KBUILD_BUILD_HOST: "buildhost"
 
     steps:
       - name: ⏰ Checkout repository
@@ -125,6 +128,8 @@ jobs:
 
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
+
+      
 
       - name: 🚀 Apply Custom Kernel Patches
         shell: bash
