@@ -137,10 +137,10 @@ jobs:
           # Yalnızca Samsung çekirdeğinde OLMAYAN ve %100 uyumlu 5 yama bırakıldı.
           COMMITS=(
             "01baff0ae3abea5027d0cd5b827dab46465f0373"
-            "ae6308ea9131a515aaac515964faa3bb17a60d34"
-            "f6bda7697e55335a49754ec92f637ace2ba4c84b"
-            "261e023dc6926be63327aeef4fa1c9c30498bd5d"
-            "606ac1e867c09d73f3bf3e942409051e438cacd6"
+            ""
+            ""
+            ""
+            ""
           )
           
           for COMMIT in "${COMMITS[@]}"; do
@@ -380,17 +380,7 @@ jobs:
           CONFIG_SBALANCE_EXCLUDE_CPUS="3,6,7"
           CONFIG_IRQ_SBALANCE_POLL_MSEC=10000
           CONFIG_SCHED_BORE=y
-          CONFIG_UCLAMP_TASK=y
-          CONFIG_UCLAMP_BUCKETS_COUNT=5
-          CONFIG_UCLAMP_TASK_GROUP=y
-          CONFIG_LITTLE_CPU_MASK=15
-          CONFIG_BIG_CPU_MASK=112
-          CONFIG_PRIME_CPU_MASK=128
-          CONFIG_DYNAMIC_FSYNC=y
-          CONFIG_DRM_MSM_KCAL_CTRL=y
           CONFIG_IRQ_WORK=y
-          CONFIG_BUILDTIME_EXTABLE_SORT=y
-          CONFIG_THREAD_INFO_IN_TASK=y
           CONFIG_DEVFREQ_BOOST=y
           
           EOF
