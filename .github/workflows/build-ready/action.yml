@@ -128,7 +128,8 @@ runs:
                 KERNELSU_NAME="KernelSU"
                 KERNELSU_ORIGIN_BRANCH="master"
                 if [[ "${{ env.SUSFS_ENABLE }}" == "true" ]]; then
-                    KERNELSU_BRANCH="master"
+                    echo "[-] ${{ env.KERNELSU_AUTO_FORK }} doesn't support SuSFS! "
+                    false
                 else
                     KERNELSU_BRANCH="master"
                 fi
@@ -178,27 +179,33 @@ runs:
             else
                 echo "[-] Please input vaild fork name!"
                 false
+
             fi
 
             if [[ "${{ env.KERNELSU_AUTO_FORK }}" == "next" ]]; then
                 KERNELSU_FOLDER="KernelSU-Next"
                 echo "KERNELSU_NAME=$KERNELSU_FOLDER" >> $GITHUB_ENV
+
             else
                 KERNELSU_FOLDER="KernelSU"
                 echo "KERNELSU_NAME=$KERNELSU_FOLDER" >> $GITHUB_ENV
+
             fi
 
             if [[ "${{ env.KERNELSU_METHOD }}" == "shell" ]]; then
                 curl -sSL "https://raw.githubusercontent.com/${KERNELSU_AUTHOR}/${KERNELSU_NAME}/refs/heads/${KERNELSU_ORIGIN_BRANCH}/kernel/setup.sh" | bash -s "$KERNELSU_BRANCH"
+
             elif [[ "${{ env.KERNELSU_METHOD }}" == "manual" ]]; then
                 git clone "https://github.com/$KERNELSU_AUTHOR/$KERNELSU_NAME.git" -b "$KERNELSU_BRANCH" "$KERNELSU_FOLDER"
                 ln -sf "../$KERNELSU_FOLDER/kernel" "drivers/kernelsu"
                 grep -q "kernelsu" "$GITHUB_WORKSPACE/device_kernel/drivers/Makefile" || printf "\nobj-\$(CONFIG_KSU) += kernelsu/\n" >> $GITHUB_WORKSPACE/device_kernel/drivers/Makefile
                 grep -q "source \"drivers/kernelsu/Kconfig\"" "$GITHUB_WORKSPACE/device_kernel/drivers/Kconfig" || sed -i "/endmenu/i\source \"drivers/kernelsu/Kconfig\"" "${GITHUB_WORKSPACE}/device_kernel/drivers/Kconfig"
                 echo "[+] KernelSU Settings done."
+
             elif [[ "${{ env.KERNELSU_METHOD }}" == "only" ]]; then
                 git clone "https://github.com/$KERNELSU_AUTHOR/$KERNELSU_NAME.git" -b "$KERNELSU_BRANCH" "$KERNELSU_FOLDER"
                 ln -sf "../$KERNELSU_FOLDER/kernel" "drivers/kernelsu"
+
             fi
           }
 
@@ -206,30 +213,38 @@ runs:
             if [[ "${{ env.KERNELSU_SOURCE }}" == *Next* ]]; then
                 KERNELSU_FOLDER="KernelSU-Next"
                 echo "KERNELSU_NAME=$KERNELSU_FOLDER" >> $GITHUB_ENV
+
             else
                 KERNELSU_FOLDER="KernelSU"
                 echo "KERNELSU_NAME=$KERNELSU_FOLDER" >> $GITHUB_ENV
+
             fi
 
             if [[ "${{ env.KERNELSU_METHOD }}" == "shell" ]]; then
                 curl -sSL "${{ env.KERNELSU_SOURCE }}" | bash -s "${{ env.KERNELSU_BRANCH }}"
+
             elif [[ "${{ env.KERNELSU_METHOD }}" == "manual" ]]; then
                 git clone "${{ env.KERNELSU_SOURCE }}" -b "${{ env.KERNELSU_BRANCH }}" "$KERNELSU_FOLDER"
                 ln -sf "../$KERNELSU_FOLDER/kernel" "drivers/kernelsu"
                 grep -q "kernelsu" "$GITHUB_WORKSPACE/device_kernel/drivers/Makefile" || printf "\nobj-\$(CONFIG_KSU) += kernelsu/\n" >> $GITHUB_WORKSPACE/device_kernel/drivers/Makefile
                 grep -q "source \"drivers/kernelsu/Kconfig\"" "$GITHUB_WORKSPACE/device_kernel/drivers/Kconfig" || sed -i "/endmenu/i\source \"drivers/kernelsu/Kconfig\"" "${GITHUB_WORKSPACE}/device_kernel/drivers/Kconfig"
                 echo "[+] KernelSU Settings done."
+
             elif [[ "${{ env.KERNELSU_METHOD }}" == "only" ]]; then
                 git clone "${{ env.KERNELSU_SOURCE }}" -b "${{ env.KERNELSU_BRANCH }}" "$KERNELSU_FOLDER"
                 ln -sf "../$KERNELSU_FOLDER/kernel" "drivers/kernelsu"
+
             fi
           }
+
 
           # Core
           if [[ ${{ env.KERNELSU_AUTO_GET }} == "true" ]]; then
             KERNELSU_AUTO
+
           else
             KERNELSU_MANUAL
+
           fi
           echo "KERNELSU_METHOD=${{ env.KERNELSU_METHOD }}" >> $GITHUB_ENV
 
@@ -244,23 +259,6 @@ runs:
 
             echo "[+] SukiSU-Ultra mitigation measures implemented."
 
-          else
-            echo "[-] Your KernelSU Fork needn't it, Skipped."
-
-          fi
-
-      - name: xxksu add SuSFS
-        shell: bash
-        run: |
-          cd $GITHUB_WORKSPACE/device_kernel/KernelSU
-
-          if [[ "${{ env.KERNELSU_SOURCE }}" == *backslashxx* ]] || [[ "${{ env.KERNELSU_AUTO_FORK }}" == "xxksu" ]]; then
-            if [[ "${{ env.SUSFS_ENABLE }}" == "true" ]]; then
-              patch -p1 < <(curl -sL "https://github.com/midori01/KernelSU/commit/xx.patch") || true
-
-              echo "[+] xxksu susfs applied."
-            fi
-            
           else
             echo "[-] Your KernelSU Fork needn't it, Skipped."
 
@@ -352,6 +350,11 @@ runs:
                 echo "CONFIG_KSU_MANUAL_HOOK=y" >> ./arch/${{ env.KERNEL_ARCH }}/configs/${{ env.DEFCONFIG_NAME }}
 
             fi
+          fi
+
+          if [[ "${{ env.KERNELSU_SOURCE }}" == *blackslashxx* ]] || [[ "${{ env.KERNELSU_AUTO_FORK }}" == "xxksu" ]]; then
+            echo "CONFIG_KSU_KPROBES_KSUD=n" >> ./arch/${{ env.KERNEL_ARCH }}/configs/${{ env.DEFCONFIG_NAME }}
+
           fi
 
           if [[ "${{ env.KERNELSU_SOURCE }}" == *SukiSU* ]] || [[ "${{ env.KERNELSU_AUTO_FORK }}" == "sukisu" ]] || [[ "${{ env.KERNELSU_SOURCE }}" == *ReSukiSU* ]] || [[ "${{ env.KERNELSU_AUTO_FORK }}" == "resukisu" ]]; then
