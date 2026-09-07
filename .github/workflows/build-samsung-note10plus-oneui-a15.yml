@@ -320,7 +320,7 @@ jobs:
           cd $GITHUB_WORKSPACE/device_kernel
           
           echo "[+] SuSFS için memfd yaması çekiliyor..."
-          curl -sL "https://github.com/fatalcoder524/kernel_patches_additional/commit/598b8b81224ce477cfbc1dbf475a6e6549b83452.patch" -o sus_memfd.patch
+          curl -sL "https://github.com/sidex15/android_kernel_lge_sm8150/commit/bc23096b9df4d76c43bfea9e217978ecc93b94d4.patch" -o sus_memfd.patch
           
           echo "[+] CRLF (Windows satır sonu) formatı temizleniyor..."
           sed -i 's/\r$//' sus_memfd.patch
