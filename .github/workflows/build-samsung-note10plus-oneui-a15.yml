@@ -315,6 +315,11 @@ jobs:
           curl -LSs "https://github.com/midori01/KernelSU/commit/resuki.patch" -o ksu_commit.patch
           patch -p2 < ksu_commit.patch
           rm ksu_commit.patch
+          # ReSukiSU TP Hook uyarı/hata kilidini kaldır
+          cd $GITHUB_WORKSPACE/device_kernel
+          if [ -f "drivers/kernelsu/Kbuild" ]; then
+              sed -i 's/.*TP hooks are incompatible.*/# &/' drivers/kernelsu/Kbuild
+          fi
 
       - name: 🪝 Patch Kernel of SUSFS
         uses: ./.github/workflows/patch-susfs
