@@ -166,7 +166,7 @@ jobs:
           
           echo "[+] Tüm yamalar kusursuz şekilde işlendi!"
 
-       - name: 🛠️ Fix sysctl.c Undeclared Identifier
+      - name: 🛠️ Fix sysctl.c Undeclared Identifier
         shell: bash
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
