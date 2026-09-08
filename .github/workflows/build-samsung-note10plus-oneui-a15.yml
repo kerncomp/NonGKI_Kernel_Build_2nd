@@ -166,6 +166,19 @@ jobs:
           
           echo "[+] Tüm yamalar kusursuz şekilde işlendi!"
 
+       - name: 🛠️ Fix sysctl.c Undeclared Identifier
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          echo "[+] sysctl.c içindeki eksik 'three' değişkeni onarılıyor..."
+          
+          # Sadece asıl tablonun tam eşleşmesini bularak değişkeni TEK BİR KERE ekler
+          sed -i '/static struct ctl_table kern_table\[\] = {/i static int three = 3;' kernel/sysctl.c
+          
+          echo "[+] Değişken tekil olarak başarıyla enjekte edildi."
+
+          echo "[+] fs/proc/task_mmu.c dosyası JIT spoofing için yamalanıyor..."
+
       - name: 🥷 Hide memfd:jit-cache from Proc Maps
         shell: bash
         run: |
