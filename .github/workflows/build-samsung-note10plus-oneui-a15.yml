@@ -179,12 +179,12 @@ jobs:
 
           echo "[+] fs/proc/task_mmu.c dosyası JIT spoofing için yamalanıyor..."
 
-      - name: 🥷 Hide memfd:jit-cache and distract from Proc Maps
+      - name: 🥷 Ultimate Stealth for memfd and distract
         shell: bash
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
           
-          echo "[+] fs/proc/task_mmu.c dosyası JIT ve distract spoofing için yamalanıyor..."
+          echo "[+] fs/proc/task_mmu.c dosyası kusursuz JIT kamuflajı için yamalanıyor..."
           
           cat << 'EOF' > patch_maps.py
           import sys
@@ -200,13 +200,23 @@ jobs:
               
           with open(file_path, "w") as f:
               for line in lines:
-                  # Çekirdek sürümüne göre seq_file_path veya seq_path fonksiyonunu yakala
-                  if "seq_file_path(m, file, \"\\n\");" in line or "seq_path(m, &file->f_path, \"\\n\");" in line:
+                  # 1. Aşama: Dosya ve cihaz numaralarını (inode & dev) sıfırla
+                  if "ino = inode->i_ino;" in line:
+                      f.write(line)
                       f.write("\t\tif (file && file->f_path.dentry && file->f_path.dentry->d_name.name) {\n")
                       f.write("\t\t\tconst char *dname = file->f_path.dentry->d_name.name;\n")
-                      # distract kelimesi de listeye eklendi
                       f.write("\t\t\tif (strstr(dname, \"jit-cache\") || strstr(dname, \"jit-zygote-cache\") || strstr(dname, \"distract\")) {\n")
-                      f.write("\t\t\t\tseq_puts(m, \"[anon:dalvik-main space]\");\n")
+                      f.write("\t\t\t\tdev = 0;\n")
+                      f.write("\t\t\t\tino = 0;\n")
+                      f.write("\t\t\t}\n")
+                      f.write("\t\t}\n")
+                  
+                  # 2. Aşama: İsmi uygun izinlere sahip JIT Cache olarak değiştir ve satır sonunu (\n) koru
+                  elif "seq_file_path(m, file, \"\\n\");" in line or "seq_path(m, &file->f_path, \"\\n\");" in line:
+                      f.write("\t\tif (file && file->f_path.dentry && file->f_path.dentry->d_name.name) {\n")
+                      f.write("\t\t\tconst char *dname = file->f_path.dentry->d_name.name;\n")
+                      f.write("\t\t\tif (strstr(dname, \"jit-cache\") || strstr(dname, \"jit-zygote-cache\") || strstr(dname, \"distract\")) {\n")
+                      f.write("\t\t\t\tseq_puts(m, \"[anon:dalvik-jit-code-cache]\\n\");\n")
                       f.write("\t\t\t} else {\n")
                       f.write("\t\t\t\t" + line.strip() + "\n")
                       f.write("\t\t\t}\n")
@@ -218,7 +228,7 @@ jobs:
           EOF
           
           python3 patch_maps.py
-          echo "[+] JIT-Cache, JIT-Zygote-Cache ve distract maskelemesi başarıyla uygulandı!"
+          echo "[+] Kusursuz maskeleme başarıyla uygulandı!"
           
       - name: ⚖️ Apply & Fix SBalance Patch (4.14 Backport)
         shell: bash
