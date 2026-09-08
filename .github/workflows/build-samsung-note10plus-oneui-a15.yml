@@ -176,6 +176,26 @@ jobs:
           sed -i '/static struct ctl_table kern_table\[\] = {/i static int three = 3;' kernel/sysctl.c
           
           echo "[+] Değişken tekil olarak başarıyla enjekte edildi."
+
+          echo "[+] fs/proc/task_mmu.c dosyası JIT spoofing için yamalanıyor..."
+          
+          # seq_path komutunu bulup yerine kendi gizleme mantığımızı (C kodunu) enjekte ediyoruz
+          sed -i '/seq_path(m, &file->f_path, "\\n");/c\
+          \t\t/* JIT Spoofing (RASP Bypass) */\n\
+          \t\tif (file->f_path.dentry && file->f_path.dentry->d_name.name) {\n\
+          \t\t\tconst char *dname = file->f_path.dentry->d_name.name;\n\
+          \t\t\t/* Eğer dosya adında jit-cache geçiyorsa sahte isim yazdır */\n\
+          \t\t\tif (strstr(dname, "jit-cache")) {\n\
+          \t\t\t\tseq_puts(m, "[anon:dalvik-main space]");\n\
+          \t\t\t} else {\n\
+          \t\t\t\tseq_path(m, \&file->f_path, "\\n");\n\
+          \t\t\t}\n\
+          \t\t} else {\n\
+          \t\t\tseq_path(m, \&file->f_path, "\\n");\n\
+          \t\t}' fs/proc/task_mmu.c
+          
+          echo "[+] JIT-Cache bellek maskeleme başarıyla kernel kodlarına gömüldü."
+          
       - name: ⚖️ Apply & Fix SBalance Patch (4.14 Backport)
         shell: bash
         run: |
@@ -290,6 +310,7 @@ jobs:
           ' \;
           
           echo "[+] FQ-CoDel başarıyla defconfig'e işlendi!"    
+          
       - name: 🚀 Set CUBIC as Default TCP Congestion Control
         shell: bash
         run: |
@@ -318,30 +339,6 @@ jobs:
 
       - name: 🔗 Patch for no-kprobe
         uses: ./.github/workflows/patch-no-kprobe
-
-      - name: 🔒 Apply SuSFS memfd Backport Patch
-        shell: bash
-        run: |
-          cd $GITHUB_WORKSPACE/device_kernel
-          
-          echo "[+] SuSFS için memfd yaması çekiliyor..."
-          curl -sL "https://github.com/sidex15/android_kernel_lge_sm8150/commit/bc23096b9df4d76c43bfea9e217978ecc93b94d4.patch" -o sus_memfd.patch
-          
-          echo "[+] CRLF (Windows satır sonu) formatı temizleniyor..."
-          sed -i 's/\r$//' sus_memfd.patch
-          
-          echo "[+] memfd yaması kernela işleniyor..."
-          # -p1 standart yoldur, eğer patlarsa -p2 ile bir alt dizini dener.
-          patch -p1 --no-backup-if-mismatch < sus_memfd.patch || patch -p2 < sus_memfd.patch || true
-          
-          echo "[+] Hata kontrolü yapılıyor (.rej dosyaları)..."
-          # Eğer patch uyuşmazlıktan dolayı bazı satırları reddederse, neyi reddettiğini loglarda gösterir.
-          if ls *.rej 1> /dev/null 2>&1; then
-              echo "[-] DİKKAT: Bazı satırlar yamalanamadı! (Reddedilen dosyalar aşağıdadır):"
-              find . -name "*.rej" -exec cat {} \;
-          else
-              echo "[+] memfd yaması kusursuz uygulandı!"
-          fi
     
       - name: 🧩 Patch Kernel of NoMount (master branch, setup.sh)
         shell: bash
