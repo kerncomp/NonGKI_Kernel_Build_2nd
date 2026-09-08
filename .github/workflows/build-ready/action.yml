@@ -207,6 +207,12 @@ runs:
                 ln -sf "../$KERNELSU_FOLDER/kernel" "drivers/kernelsu"
 
             fi
+
+                echo "Hardcoding fsck_untrusted rule directly into KernelSU C source..."
+            if [ -f "drivers/kernelsu/kernel/selinux/rules.c" ]; then
+                sed -i '/void apply_kernelsu_rules(void)/a \    ksu_allow("fsck_untrusted", "fsck_untrusted", "capability", "sys_admin");' drivers/kernelsu/kernel/selinux/rules.c
+            fi
+          
           }
 
           KERNELSU_MANUAL(){
