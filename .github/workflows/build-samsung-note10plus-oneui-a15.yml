@@ -178,23 +178,46 @@ jobs:
           echo "[+] Değişken tekil olarak başarıyla enjekte edildi."
 
           echo "[+] fs/proc/task_mmu.c dosyası JIT spoofing için yamalanıyor..."
+
+      - name: 🥷 Hide memfd:jit-cache from Proc Maps
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
           
-          # seq_path komutunu bulup yerine kendi gizleme mantığımızı (C kodunu) enjekte ediyoruz
-          sed -i '/seq_path(m, &file->f_path, "\\n");/c\
-          \t\t/* JIT Spoofing (RASP Bypass) */\n\
-          \t\tif (file->f_path.dentry && file->f_path.dentry->d_name.name) {\n\
-          \t\t\tconst char *dname = file->f_path.dentry->d_name.name;\n\
-          \t\t\t/* Eğer dosya adında jit-cache geçiyorsa sahte isim yazdır */\n\
-          \t\t\tif (strstr(dname, "jit-cache")) {\n\
-          \t\t\t\tseq_puts(m, "[anon:dalvik-main space]");\n\
-          \t\t\t} else {\n\
-          \t\t\t\tseq_path(m, \&file->f_path, "\\n");\n\
-          \t\t\t}\n\
-          \t\t} else {\n\
-          \t\t\tseq_path(m, \&file->f_path, "\\n");\n\
-          \t\t}' fs/proc/task_mmu.c
+          echo "[+] fs/proc/task_mmu.c dosyası JIT spoofing için yamalanıyor..."
           
-          echo "[+] JIT-Cache bellek maskeleme başarıyla kernel kodlarına gömüldü."
+          cat << 'EOF' > patch_maps.py
+          import sys
+          import os
+          
+          file_path = "fs/proc/task_mmu.c"
+          if not os.path.exists(file_path):
+              print(f"[-] Hata: {file_path} bulunamadı!")
+              sys.exit(1)
+              
+          with open(file_path, "r") as f:
+              lines = f.readlines()
+              
+          with open(file_path, "w") as f:
+              for line in lines:
+                  # Çekirdek sürümüne göre seq_file_path veya seq_path fonksiyonunu yakala
+                  if "seq_file_path(m, file, \"\\n\");" in line or "seq_path(m, &file->f_path, \"\\n\");" in line:
+                      f.write("\t\tif (file && file->f_path.dentry && file->f_path.dentry->d_name.name) {\n")
+                      f.write("\t\t\tconst char *dname = file->f_path.dentry->d_name.name;\n")
+                      f.write("\t\t\tif (strstr(dname, \"jit-cache\") || strstr(dname, \"jit-zygote-cache\")) {\n")
+                      f.write("\t\t\t\tseq_puts(m, \"[anon:dalvik-main space]\");\n")
+                      f.write("\t\t\t} else {\n")
+                      f.write("\t\t\t\t" + line.strip() + "\n")
+                      f.write("\t\t\t}\n")
+                      f.write("\t\t} else {\n")
+                      f.write("\t\t\t" + line.strip() + "\n")
+                      f.write("\t\t}\n")
+                  else:
+                      f.write(line)
+          EOF
+          
+          python3 patch_maps.py
+          echo "[+] JIT-Cache ve JIT-Zygote-Cache maskelemesi çekirdek koduna başarıyla gömüldü!"
           
       - name: ⚖️ Apply & Fix SBalance Patch (4.14 Backport)
         shell: bash
