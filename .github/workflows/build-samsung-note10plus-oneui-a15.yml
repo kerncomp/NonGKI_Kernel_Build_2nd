@@ -317,6 +317,37 @@ jobs:
           
           echo "[+] TCP CUBIC başarıyla defconfig'e işlendi!"
 
+      - name: 🔒 Apply SuSFS memfd & KSU-Next Hide Patch
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          echo "[+] SuSFS için memfd yaması çekiliyor..."
+          curl -sL "https://github.com/sidex15/android_kernel_lge_sm8150/commit/bc23096b9df4d76c43bfea9e217978ecc93b94d4.patch" -o sus_memfd.patch
+          
+          echo "[+] KernelSU-Next için distract/jit-cache gizleme yaması çekiliyor..."
+          curl -sL "https://github.com/sidex15/KernelSU-Next/commit/27fb3cfb5ffb4f6abd248819f05a4d757af3880c.patch" -o ksu_hide.patch
+          
+          echo "[+] CRLF (Windows satır sonu) formatı temizleniyor..."
+          sed -i 's/\r$//' sus_memfd.patch
+          sed -i 's/\r$//' ksu_hide.patch
+          
+          echo "[+] memfd yaması kernela işleniyor..."
+          patch -p1 --no-backup-if-mismatch < sus_memfd.patch || patch -p2 < sus_memfd.patch || true
+          
+          echo "[+] KernelSU-Next yaması işleniyor..."
+          if [ -d "KernelSU-Next" ]; then
+              echo "[+] KernelSU-Next klasörü bulundu, yama oraya uygulanıyor..."
+              cd KernelSU-Next
+              patch -p1 --no-backup-if-mismatch < ../ksu_hide.patch || patch -p2 < ../ksu_hide.patch || true
+              cd ..
+          else
+              echo "[+] KernelSU-Next klasörü bulunamadı, kök dizinde deneniyor..."
+              patch -p1 --no-backup-if-mismatch < ksu_hide.patch || patch -p2 < ksu_hide.patch || true
+          fi
+          
+          echo "[+] Yamalar işlendi!"
+
       - name: 🪝 Patch Kernel of SUSFS
         uses: ./.github/workflows/patch-susfs
 
