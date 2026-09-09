@@ -281,36 +281,6 @@ jobs:
           
           echo "[+] TCP CUBIC başarıyla defconfig'e işlendi!"
 
-      - name: 🔒 Apply SuSFS memfd & ReSukiSU Hide Patch
-        shell: bash
-        run: |
-          cd $GITHUB_WORKSPACE/device_kernel
-          
-          echo "[+] Yamalar çekiliyor..."
-          curl -sL "https://github.com/sidex15/android_kernel_lge_sm8150/commit/bc23096b9df4d76c43bfea9e217978ecc93b94d4.patch" -o sus_memfd.patch
-          curl -sL "https://github.com/sidex15/KernelSU-Next/commit/27fb3cfb5ffb4f6abd248819f05a4d757af3880c.patch" -o ksu_hide.patch
-          
-          echo "[+] Format temizliği..."
-          sed -i 's/\r$//' sus_memfd.patch
-          sed -i 's/\r$//' ksu_hide.patch
-          
-          echo "[+] SuSFS memfd yaması işleniyor (Esnek mod)..."
-          # -p1 ve -p2 dener, ayrıca --fuzz=3 ile satır kaymalarını tolere eder
-          patch -p1 --fuzz=3 --no-backup-if-mismatch < sus_memfd.patch || patch -p2 --fuzz=3 < sus_memfd.patch || true
-          
-          echo "[+] ReSukiSU yaması doğru klasörde işleniyor..."
-          if [ -d "KernelSU" ]; then
-              echo "[+] KernelSU klasörü bulundu!"
-              cd KernelSU
-              patch -p1 --no-backup-if-mismatch < ../ksu_hide.patch || true
-              cd ..
-          else
-              echo "[-] Klasör bulunamadı, modül zaten entegre edilmiş olabilir."
-              patch -p1 --no-backup-if-mismatch < ksu_hide.patch || true
-          fi
-          
-          echo "[+] Yamalar işlendi!"
-
       - name: 🪝 Patch Kernel of SUSFS
         uses: ./.github/workflows/patch-susfs
 
