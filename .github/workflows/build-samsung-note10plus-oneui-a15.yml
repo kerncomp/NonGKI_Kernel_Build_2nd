@@ -231,42 +231,6 @@ jobs:
           
           echo "[+] SBalance yaması ve Backport onarımı kusursuz tamamlandı!"
       
-      - name: 🚀 Apply Native 4.14 Maple I/O Scheduler & Fixes
-        shell: bash
-        run: |
-          cd $GITHUB_WORKSPACE/device_kernel
-          
-          echo "[+] 4.14 Uyumlu Maple I/O ana yaması çekiliyor..."
-          curl -sL "https://github.com/manipvlator/los_kernel_xiaomi_sm6150/commit/5f39c5f68f9a8890cbf7639e35a3edb6f873bd65.patch" -o maple_414_base.patch
-          
-          echo "[+] Maple I/O ek düzeltme yamaları (Fixes) çekiliyor..."
-          curl -sL "https://github.com/manipvlator/los_kernel_xiaomi_sm6150/commit/a181d8276b765c481b7643830fd49153da7d28b2.patch" -o maple_414_fix1.patch
-          curl -sL "https://github.com/manipvlator/los_kernel_xiaomi_sm6150/commit/4aaec6194aa556a473bf1cc82afde27825e16dd1.patch" -o maple_414_fix2.patch
-          
-          echo "[+] CRLF temizliği yapılıyor..."
-          sed -i 's/\r$//' maple_414_base.patch maple_414_fix1.patch maple_414_fix2.patch
-          
-          echo "[+] Yamalar sırayla (Ana Yama -> Düzeltme 1 -> Düzeltme 2) uygulanıyor..."
-          patch -p1 < maple_414_base.patch || true
-          patch -p1 < maple_414_fix1.patch || true
-          patch -p1 < maple_414_fix2.patch || true
-          
-          echo "[+] Güvenlik önlemleri (Makefile çakışmaları için)..."
-          if ! grep -q "maple-iosched.o" block/Makefile; then
-              echo "" >> block/Makefile
-              echo "obj-\$(CONFIG_IOSCHED_MAPLE) += maple-iosched.o" >> block/Makefile
-          fi
-          
-          
-          echo "[+] Maple, Defconfig dosyalarına işleniyor ve varsayılan yapılıyor!"
-          find arch/arm64/configs -type f -name "*defconfig" -exec sh -c '
-              echo "" >> "{}"
-              echo "CONFIG_IOSCHED_MAPLE=y" >> "{}"
-              sed -i "s/CONFIG_DEFAULT_IOSCHED=.*/CONFIG_DEFAULT_IOSCHED=\"maple\"/g" "{}"
-          ' \;
-          
-          echo "[+] 4.14 Native Maple ve ek yamaları başarıyla entegre edildi!"
-          
       - name: 🚀 Enable FQ-CoDel (Network Scheduler)
         shell: bash
         run: |
