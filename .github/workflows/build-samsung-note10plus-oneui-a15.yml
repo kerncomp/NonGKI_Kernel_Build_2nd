@@ -129,8 +129,6 @@ jobs:
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
 
-      
-
       - name: 🚀 Apply Custom Kernel Patches
         shell: bash
         run: |
@@ -230,56 +228,6 @@ jobs:
           echo -e "\n\t}\n}" >> kernel/irq/sbalance.c
           
           echo "[+] SBalance yaması ve Backport onarımı kusursuz tamamlandı!"
-      
-      - name: 🚀 Enable FQ-CoDel (Network Scheduler)
-        shell: bash
-        run: |
-          cd $GITHUB_WORKSPACE/device_kernel
-          
-          echo "[+] FQ-CoDel için QoS Ana Şalterleri açılıyor ve ayarlanıyor..."
-          find arch/arm64/configs -type f -name "*defconfig" -exec sh -c '
-              echo "" >> "{}"
-              
-              # 1. QoS ve Ağ Zamanlama Ana Şalterlerini Açıyoruz (ZORUNLU BAĞIMLILIK)
-              echo "CONFIG_NET_SCHED=y" >> "{}"
-              
-              # 2. FQ-CoDel Sürücüsünü Aktif Ediyoruz
-              echo "CONFIG_NET_SCH_FQ_CODEL=y" >> "{}"
-              echo "CONFIG_DEFAULT_FQ_CODEL=y" >> "{}"
-              
-              # 3. Varsayılan Zamanlayıcıyı fq_codel Olarak Değiştiriyoruz
-              sed -i "s/CONFIG_DEFAULT_NET_SCH=.*/CONFIG_DEFAULT_NET_SCH=\"fq_codel\"/g" "{}"
-              
-              # Eğer CONFIG_DEFAULT_NET_SCH satırı orijinal dosyada hiç yoksa zorla ekliyoruz
-              if ! grep -q "CONFIG_DEFAULT_NET_SCH=\"fq_codel\"" "{}"; then
-                  echo "CONFIG_DEFAULT_NET_SCH=\"fq_codel\"" >> "{}"
-              fi
-          ' \;
-          
-          echo "[+] FQ-CoDel başarıyla defconfig'e işlendi!"    
-          
-      - name: 🚀 Set CUBIC as Default TCP Congestion Control
-        shell: bash
-        run: |
-          cd $GITHUB_WORKSPACE/device_kernel
-          
-          echo "[+] TCP CUBIC Algoritması varsayılan olarak ayarlanıyor..."
-          find arch/arm64/configs -type f -name "*defconfig" -exec sh -c '
-              # Olası tekrarları ve çakışmaları önlemek için eski ayarları temizliyoruz
-              sed -i "/CONFIG_TCP_CONG_CUBIC/d" "{}"
-              sed -i "/CONFIG_DEFAULT_CUBIC/d" "{}"
-              sed -i "/CONFIG_DEFAULT_TCP_CONG/d" "{}"
-              
-              echo "" >> "{}"
-              # CUBIC modülünü çekirdeğe gömülü derlenmesi için aktif ediyoruz
-              echo "CONFIG_TCP_CONG_CUBIC=y" >> "{}"
-              
-              # CUBIC algoritmasını varsayılan olarak belirliyoruz
-              echo "CONFIG_DEFAULT_CUBIC=y" >> "{}"
-              echo "CONFIG_DEFAULT_TCP_CONG=\"cubic\"" >> "{}"
-          ' \;
-          
-          echo "[+] TCP CUBIC başarıyla defconfig'e işlendi!"
 
       - name: 🪝 Patch Kernel of SUSFS
         uses: ./.github/workflows/patch-susfs
@@ -382,6 +330,7 @@ jobs:
           curl -Lo kpatch-android https://github.com/KernelSU-Next/KPatch-Next/releases/download/${KPATCH_VER}/kpatch-android
           chmod +x kptools kpimg kpatch-android
           ./kptools --version || true
+          
       - name: 🩹 Patch Kernel Image with KPatch-Next
         shell: bash
         run: |
@@ -396,6 +345,7 @@ jobs:
           ./kptools -p -i "$IMAGE" -k ./kpimg -o "$PATCHED_IMAGE"
           echo "KPATCH_PATCHED=true" >> $GITHUB_ENV
           echo "[+] Kernel Image KPatch-Next ile yamalandı: $PATCHED_IMAGE"
+          
       - name: 📝 Save build metadata
         shell: bash
         run: |
