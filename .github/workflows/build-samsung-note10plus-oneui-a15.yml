@@ -176,6 +176,38 @@ jobs:
           echo "[+] Değişken tekil olarak başarıyla enjekte edildi."
 
           echo "[+] fs/proc/task_mmu.c dosyası JIT spoofing için yamalanıyor..."
+
+      - name: ⚙️ Özel Zamanlayıcı Optimizasyonları (NOOP Default)
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          echo "[+] Defconfig optimize ediliyor..."
+          find arch/arm64/configs -type f -name "*defconfig" -exec sh -c '
+              # 1. IO Schedulers (Varsayılan: NOOP)
+              sed -i "/CONFIG_DEFAULT_CFQ/d" "{}"
+              sed -i "/CONFIG_DEFAULT_IOSCHED/d" "{}"
+              echo "CONFIG_IOSCHED_NOOP=y" >> "{}"
+              echo "CONFIG_DEFAULT_NOOP=y" >> "{}"
+              echo "CONFIG_DEFAULT_IOSCHED=\"noop\"" >> "{}"
+              
+              # 2. Network Schedulers (FQ_CODEL)
+              # Not: FQ_Codel için gereken ana şalter (CONFIG_NET_SCHED) eklendi
+              echo "CONFIG_NET_SCHED=y" >> "{}"
+              echo "CONFIG_NET_SCH_FQ_CODEL=y" >> "{}"
+              echo "CONFIG_NET_SCH_DEFAULT=y" >> "{}"
+              sed -i "/CONFIG_DEFAULT_NET_SCH/d" "{}"
+              echo "CONFIG_DEFAULT_NET_SCH=\"fq_codel\"" >> "{}"
+              
+              # 3. TCP Congestion (CUBIC)
+              echo "CONFIG_TCP_CONG_ADVANCED=y" >> "{}"
+              echo "CONFIG_TCP_CONG_CUBIC=y" >> "{}"
+              echo "CONFIG_DEFAULT_CUBIC=y" >> "{}"
+              sed -i "/CONFIG_DEFAULT_TCP_CONG/d" "{}"
+              echo "CONFIG_DEFAULT_TCP_CONG=\"cubic\"" >> "{}"
+          ' \;
+          
+          echo "[+] Optimizasyonlar eklendi!"
           
       - name: ⚖️ Apply & Fix SBalance Patch (4.14 Backport)
         shell: bash
