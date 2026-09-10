@@ -231,6 +231,37 @@ jobs:
           
       - name: 🔒 Patch Kernel of Baseband Guard
         uses: ./.github/workflows/patch-baseband-guard
+
+      - name: 🛠️ Fix SuSFS Linker Error (kallsyms)
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          echo "[+] Eksik susfs_starts_with fonksiyonu kallsyms.c'nin BAŞINA ekleniyor..."
+          
+          # 1. Kurtarıcı fonksiyonu geçici dosyaya yaz
+          cat << 'EOF' > kallsyms_fix.c
+          #include <linux/types.h>
+          
+          /* SuSFS Linker Fix (Weak Definition) */
+          bool susfs_starts_with(const char *str, const char *prefix);
+          __attribute__((weak)) bool susfs_starts_with(const char *str, const char *prefix) {
+              while (*prefix) {
+                  if (*prefix++ != *str++)
+                      return false;
+              }
+              return true;
+          }
+          
+          EOF
+          
+          # 2. Orijinal kallsyms.c içeriğini bu kodun altına ekle
+          cat kernel/kallsyms.c >> kallsyms_fix.c
+          
+          # 3. Eski dosyanın üzerine yaz
+          mv kallsyms_fix.c kernel/kallsyms.c
+          
+          echo "[+] Linker yaması başarıyla en üste uygulandı!"
           
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
