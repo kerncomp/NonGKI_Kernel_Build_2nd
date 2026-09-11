@@ -303,7 +303,7 @@ jobs:
           echo "[+] Linker yaması başarıyla en üste uygulandı!"
 
       - name: 🛡️ Inject Fake Access Rules to KernelSU
-        shell: python3
+        shell: python
         run: |
           import os
           
@@ -348,8 +348,6 @@ jobs:
           else:
               print("[-] HATA: Enjeksiyon noktası bulunamadı, KernelSU sürümü farklı olabilir!")
               exit(1)
-              
-          
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
           
