@@ -302,52 +302,53 @@ jobs:
           
           echo "[+] Linker yaması başarıyla en üste uygulandı!"
 
-      - name: 🛡️ Inject Fake Access Rules to KernelSU
+      - name: 🛡️ Inject Fake Access Rules to KernelSU V2
         shell: python
         run: |
           import os
+          import re
           
-          # selinux_hide.c dosyasını sistemde dinamik olarak bulur
-          target_file = None
+          target = None
           for root, dirs, files in os.walk("."):
               if "selinux_hide.c" in files:
-                  target_file = os.path.join(root, "selinux_hide.c")
+                  target = os.path.join(root, "selinux_hide.c")
                   break
-                  
-          if not target_file:
-              print("[-] KRİTİK HATA: selinux_hide.c bulunamadı!")
+          
+          if not target:
+              print("[-] HATA: selinux_hide.c bulunamadi!")
               exit(1)
               
-          with open(target_file, "r", encoding="utf-8") as f:
+          with open(target, "r", encoding="utf-8") as f:
               content = f.read()
-              
-          # my_write_access fonksiyonunun içindeki eşsiz değişken tanımlama satırını bulur
-          search_str = "char *scon = NULL, *tcon = NULL;"
           
-          # Araya kaynak kod seviyesinde yerleştirilecek C bypass bloğu
-          inject_code = """
-          // ===== EKLENEN SELINUX BYPASS KISMI =====
-          if (strnstr(buf, "u:r:shell:s0", size) && strnstr(buf, "u:r:su:s0", size)) {
-              return scnprintf(buf, SIMPLE_TRANSACTION_LIMIT, "%x %x %x %x %u %x", 0, 0xffffffff, 0, 0xffffffff, 1, 0);
-          }
-          if (strnstr(buf, "u:r:fsck_untrusted:s0", size) && strnstr(buf, "capability", size)) {
-              return scnprintf(buf, SIMPLE_TRANSACTION_LIMIT, "%x %x %x %x %u %x", 0, 0xffffffff, 0, 0xffffffff, 1, 0);
-          }
-          if (strnstr(buf, "u:r:adbd:s0", size) && strnstr(buf, "u:r:adbroot:s0", size)) {
-              return scnprintf(buf, SIMPLE_TRANSACTION_LIMIT, "%x %x %x %x %u %x", 0, 0xffffffff, 0, 0xffffffff, 1, 0);
-          }
-          // ===== EKLENEN BYPASS KISMI SONU =====
+          inject = """
+              /* ===== EKLENEN KESIN BYPASS ===== */
+              if (strcmp(scon, "u:r:fsck_untrusted:s0") == 0 && strcmp(tcon, "u:r:fsck_untrusted:s0") == 0) {
+                  length = scnprintf(buf, SIMPLE_TRANSACTION_LIMIT, "%x %x %x %x %u %x", 0, 0xffffffff, 0, 0xffffffff, 1, 0);
+                  goto out;
+              }
+              if (strcmp(scon, "u:r:shell:s0") == 0 && strcmp(tcon, "u:r:su:s0") == 0) {
+                  length = scnprintf(buf, SIMPLE_TRANSACTION_LIMIT, "%x %x %x %x %u %x", 0, 0xffffffff, 0, 0xffffffff, 1, 0);
+                  goto out;
+              }
+              if (strcmp(scon, "u:r:adbd:s0") == 0 && strcmp(tcon, "u:r:adbroot:s0") == 0) {
+                  length = scnprintf(buf, SIMPLE_TRANSACTION_LIMIT, "%x %x %x %x %u %x", 0, 0xffffffff, 0, 0xffffffff, 1, 0);
+                  goto out;
+              }
+              /* ================================ */
+          """
           
-          char *scon = NULL, *tcon = NULL;"""
+          pattern = re.compile(r'(if\s*\(\s*sscanf\s*\(\s*buf,\s*"%s\s+%s\s+%hu",\s*scon,\s*tcon,\s*&tclass\s*\)\s*!=\s*3\s*\)\s*goto\s*out;)')
           
-          if search_str in content:
-              content = content.replace(search_str, inject_code, 1)
-              with open(target_file, "w", encoding="utf-8") as f:
+          if pattern.search(content):
+              content = pattern.sub(r'\g<1>\n' + inject, content, count=1)
+              with open(target, "w", encoding="utf-8") as f:
                   f.write(content)
-              print("[+] Bypass kodu selinux_hide.c içine başarıyla enjekte edildi!")
+              print("[+] V2 Bypass kodu basariyla enjekte edildi!")
           else:
-              print("[-] HATA: Enjeksiyon noktası bulunamadı, KernelSU sürümü farklı olabilir!")
+              print("[-] HATA: sscanf satiri bulunamadi.")
               exit(1)
+              
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
           
