@@ -186,37 +186,46 @@ jobs:
           
           echo "[+] SBalance yaması ve Backport onarımı kusursuz tamamlandı!"
 
-      - name: ⚙️ Özel Zamanlayıcı Optimizasyonları (NOOP Default)
+      - name: ⚙️ Özel Zamanlayıcı Optimizasyonları (Hardcoded & Locked)
         shell: bash
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
           
-          echo "[+] Defconfig optimize ediliyor..."
+          echo "[+] Kconfig ayarları işleniyor..."
           find arch/arm64/configs -type f -name "*defconfig" -exec sh -c '
-              # 1. IO Schedulers (Varsayılan: NOOP)
               sed -i "/CONFIG_DEFAULT_CFQ/d" "{}"
               sed -i "/CONFIG_DEFAULT_IOSCHED/d" "{}"
               echo "CONFIG_IOSCHED_NOOP=y" >> "{}"
               echo "CONFIG_DEFAULT_NOOP=y" >> "{}"
               echo "CONFIG_DEFAULT_IOSCHED=\"noop\"" >> "{}"
               
-              # 2. Network Schedulers (FQ_CODEL)
-              # Not: FQ_Codel için gereken ana şalter (CONFIG_NET_SCHED) eklendi
               echo "CONFIG_NET_SCHED=y" >> "{}"
               echo "CONFIG_NET_SCH_FQ_CODEL=y" >> "{}"
+              echo "CONFIG_DEFAULT_FQ_CODEL=y" >> "{}"
               echo "CONFIG_NET_SCH_DEFAULT=y" >> "{}"
               sed -i "/CONFIG_DEFAULT_NET_SCH/d" "{}"
               echo "CONFIG_DEFAULT_NET_SCH=\"fq_codel\"" >> "{}"
               
-              # 3. TCP Congestion (CUBIC)
               echo "CONFIG_TCP_CONG_ADVANCED=y" >> "{}"
               echo "CONFIG_TCP_CONG_CUBIC=y" >> "{}"
               echo "CONFIG_DEFAULT_CUBIC=y" >> "{}"
               sed -i "/CONFIG_DEFAULT_TCP_CONG/d" "{}"
               echo "CONFIG_DEFAULT_TCP_CONG=\"cubic\"" >> "{}"
           ' \;
+
+          echo "[+] FQ_CODEL kaynak koduna gömülüyor ve kilitleniyor..."
+          # 1. Kaynak kod içindeki pfifo_fast varsayımını kökten fq_codel ile değiştir.
+          sed -i 's/"pfifo_fast"/"fq_codel"/g' net/sched/sch_generic.c
           
-          echo "[+] Optimizasyonlar eklendi!"
+          # 2. Sysctl izinlerini 0644'ten 0444'e (Sadece Okunabilir) çek!
+          # Android init.rc "default_qdisc" değiştirmeye çalıştığında Permission Denied yiyecek.
+          sed -i '/"default_qdisc"/,/mode/ s/0644/0444/' net/core/sysctl_net_core.c
+          
+          echo "[+] NOOP I/O Zamanlayıcısı kilitleniyor..."
+          # Android /sys/block/.../scheduler dosyasına yazdığında, işlemi yapmadan direkt "başarılı" döner (return count).
+          sed -i '/ssize_t elv_iosched_store/,/{/ s/{/{\n\treturn count; \/\/ Android init ezmesini engelle/' block/elevator.c
+          
+          echo "[+] Optimizasyonlar kalıcı olarak çekirdeğe kilitlendi!"
 
       - name: 🪝 Patch Kernel of SUSFS
         uses: ./.github/workflows/patch-susfs
