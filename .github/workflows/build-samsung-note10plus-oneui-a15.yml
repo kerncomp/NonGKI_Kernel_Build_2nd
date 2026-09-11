@@ -217,14 +217,6 @@ jobs:
           # 1. Kaynak kod içindeki pfifo_fast varsayımını kökten fq_codel ile değiştir.
           sed -i 's/"pfifo_fast"/"fq_codel"/g' net/sched/sch_generic.c
           
-          # 2. Sysctl izinlerini 0644'ten 0444'e (Sadece Okunabilir) çek!
-          # Android init.rc "default_qdisc" değiştirmeye çalıştığında Permission Denied yiyecek.
-          sed -i '/"default_qdisc"/,/mode/ s/0644/0444/' net/core/sysctl_net_core.c
-          
-          echo "[+] NOOP I/O Zamanlayıcısı kilitleniyor..."
-          # Android /sys/block/.../scheduler dosyasına yazdığında, işlemi yapmadan direkt "başarılı" döner (return count).
-          sed -i '/ssize_t elv_iosched_store/,/{/ s/{/{\n\treturn count; \/\/ Android init ezmesini engelle/' block/elevator.c
-          
           echo "[+] Optimizasyonlar kalıcı olarak çekirdeğe kilitlendi!"
 
       - name: 🪝 Patch Kernel of SUSFS
