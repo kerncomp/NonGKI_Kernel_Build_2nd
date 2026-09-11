@@ -128,54 +128,6 @@ jobs:
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
 
-      - name: 🛡️ Inject Fake Access Rules to KernelSU
-        shell: python3
-        run: |
-          import os
-          
-          # selinux_hide.c dosyasını sistemde dinamik olarak bulur
-          target_file = None
-          for root, dirs, files in os.walk("."):
-              if "selinux_hide.c" in files:
-                  target_file = os.path.join(root, "selinux_hide.c")
-                  break
-                  
-          if not target_file:
-              print("[-] KRİTİK HATA: selinux_hide.c bulunamadı!")
-              exit(1)
-              
-          with open(target_file, "r", encoding="utf-8") as f:
-              content = f.read()
-              
-          # my_write_access fonksiyonunun içindeki eşsiz değişken tanımlama satırını bulur
-          search_str = "char *scon = NULL, *tcon = NULL;"
-          
-          # Araya kaynak kod seviyesinde yerleştirilecek C bypass bloğu
-          inject_code = """
-          // ===== EKLENEN SELINUX BYPASS KISMI =====
-          if (strnstr(buf, "u:r:shell:s0", size) && strnstr(buf, "u:r:su:s0", size)) {
-              return scnprintf(buf, SIMPLE_TRANSACTION_LIMIT, "%x %x %x %x %u %x", 0, 0xffffffff, 0, 0xffffffff, 1, 0);
-          }
-          if (strnstr(buf, "u:r:fsck_untrusted:s0", size) && strnstr(buf, "capability", size)) {
-              return scnprintf(buf, SIMPLE_TRANSACTION_LIMIT, "%x %x %x %x %u %x", 0, 0xffffffff, 0, 0xffffffff, 1, 0);
-          }
-          if (strnstr(buf, "u:r:adbd:s0", size) && strnstr(buf, "u:r:adbroot:s0", size)) {
-              return scnprintf(buf, SIMPLE_TRANSACTION_LIMIT, "%x %x %x %x %u %x", 0, 0xffffffff, 0, 0xffffffff, 1, 0);
-          }
-          // ===== EKLENEN BYPASS KISMI SONU =====
-          
-          char *scon = NULL, *tcon = NULL;"""
-          
-          if search_str in content:
-              content = content.replace(search_str, inject_code, 1)
-              with open(target_file, "w", encoding="utf-8") as f:
-                  f.write(content)
-              print("[+] Bypass kodu selinux_hide.c içine başarıyla enjekte edildi!")
-          else:
-              print("[-] HATA: Enjeksiyon noktası bulunamadı, KernelSU sürümü farklı olabilir!")
-              exit(1)
-              
-
       - name: ⚡ Apply No-OC & Stock Voltage Patch
         shell: bash
         run: |
@@ -349,6 +301,54 @@ jobs:
           mv kallsyms_fix.c kernel/kallsyms.c
           
           echo "[+] Linker yaması başarıyla en üste uygulandı!"
+
+      - name: 🛡️ Inject Fake Access Rules to KernelSU
+        shell: python3
+        run: |
+          import os
+          
+          # selinux_hide.c dosyasını sistemde dinamik olarak bulur
+          target_file = None
+          for root, dirs, files in os.walk("."):
+              if "selinux_hide.c" in files:
+                  target_file = os.path.join(root, "selinux_hide.c")
+                  break
+                  
+          if not target_file:
+              print("[-] KRİTİK HATA: selinux_hide.c bulunamadı!")
+              exit(1)
+              
+          with open(target_file, "r", encoding="utf-8") as f:
+              content = f.read()
+              
+          # my_write_access fonksiyonunun içindeki eşsiz değişken tanımlama satırını bulur
+          search_str = "char *scon = NULL, *tcon = NULL;"
+          
+          # Araya kaynak kod seviyesinde yerleştirilecek C bypass bloğu
+          inject_code = """
+          // ===== EKLENEN SELINUX BYPASS KISMI =====
+          if (strnstr(buf, "u:r:shell:s0", size) && strnstr(buf, "u:r:su:s0", size)) {
+              return scnprintf(buf, SIMPLE_TRANSACTION_LIMIT, "%x %x %x %x %u %x", 0, 0xffffffff, 0, 0xffffffff, 1, 0);
+          }
+          if (strnstr(buf, "u:r:fsck_untrusted:s0", size) && strnstr(buf, "capability", size)) {
+              return scnprintf(buf, SIMPLE_TRANSACTION_LIMIT, "%x %x %x %x %u %x", 0, 0xffffffff, 0, 0xffffffff, 1, 0);
+          }
+          if (strnstr(buf, "u:r:adbd:s0", size) && strnstr(buf, "u:r:adbroot:s0", size)) {
+              return scnprintf(buf, SIMPLE_TRANSACTION_LIMIT, "%x %x %x %x %u %x", 0, 0xffffffff, 0, 0xffffffff, 1, 0);
+          }
+          // ===== EKLENEN BYPASS KISMI SONU =====
+          
+          char *scon = NULL, *tcon = NULL;"""
+          
+          if search_str in content:
+              content = content.replace(search_str, inject_code, 1)
+              with open(target_file, "w", encoding="utf-8") as f:
+                  f.write(content)
+              print("[+] Bypass kodu selinux_hide.c içine başarıyla enjekte edildi!")
+          else:
+              print("[-] HATA: Enjeksiyon noktası bulunamadı, KernelSU sürümü farklı olabilir!")
+              exit(1)
+              
           
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
