@@ -221,57 +221,40 @@ jobs:
 
       - name: 🪝 Patch Kernel of SUSFS
         uses: ./.github/workflows/patch-susfs
-
-      - name: 🔧 Add sepolicy rules to selinux_hide.c
-        shell: bash
+        
+      - name: 🛡️ Hardcode SELinux fsck_untrusted Bypass (Robust)
+        shell: python3
         run: |
-          cd $GITHUB_WORKSPACE/device_kernel
-          FILE="drivers/kernelsu/feature/selinux_hide.c"
+          import os
 
-          if [ ! -f "$FILE" ]; then
-            echo "[-] selinux_hide.c bulunamadı: $FILE"
-            exit 0
-          fi
+          file_path = "device_kernel/security/selinux/hooks.c"
+          with open(file_path, "r", encoding="utf-8") as f:
+              content = f.read()
 
-          # Zaten eklenmiş mi kontrol et
-          if grep -q "fsck_sys_admin_args" "$FILE"; then
-            echo "[+] Kurallar zaten ekli, atlanıyor."
-            exit 0
-          fi
-
-          echo "[+] Sepolicy kuralları ekleniyor..."
-
-          # Fonksiyon gövdesinin içine ekle (init fonksiyonundan önce)
-          python3 - << 'PYEOF'
-          import re
-          path = "drivers/kernelsu/feature/selinux_hide.c"
-          with open(path, "r") as f:
-              data = f.read()
-
-          insertion = '''
-          const char *adbroot_args[] = { "adbroot", "domain" };
-          ksu_add_shit_to_list(KSU_SEPOLICY_CMD_TYPE, adbroot_args);
-
-          const char *fsck_sys_admin_args[] = { "fsck_untrusted", "fsck_untrusted", "capability", "sys_admin" };
-          ksu_add_shit_to_list(KSU_SEPOLICY_CMD_XPERM, fsck_sys_admin_args);
-
-          const char *shell_su_args[] = { "shell", "su", "process", "transition" };
-          ksu_add_shit_to_list(KSU_SEPOLICY_CMD_TYPE_TRANSITION, shell_su_args);
-          '''
-
-          # ksu_selinux_hide_handle_post_fs_data fonksiyonunun içine ekle
-          pattern = r"(void\s+ksu_selinux_hide_handle_post_fs_data\s*\(\s*\)\s*\{)"
-          if re.search(pattern, data):
-              data = re.sub(pattern, r"\1" + insertion, data, count=1)
-              with open(path, "w") as f:
-                  f.write(data)
-              print("[+] Kurallar eklendi.")
+          # Sadece fonksiyonun benzersiz imzasını arıyoruz, boşluklara takılmıyoruz
+          func_signature = "static int selinux_capable("
+          
+          if func_signature in content:
+              func_idx = content.find(func_signature)
+              # Fonksiyon imzasından sonraki İLK açılış süslü parantezini bul
+              brace_idx = content.find("{", func_idx)
+              
+              if brace_idx != -1:
+                  # \n ve \t ile C dilinin doğal formatlamasını kullanıyoruz
+                  bypass_code = "\n\t/* fsck_untrusted sys_admin bypass */\n\tif (cap == CAP_SYS_ADMIN && !strncmp(current->comm, \"fsck\", 4))\n\t\treturn 0;\n"
+                  
+                  # Parantezden hemen sonrasına bypass kodunu zımbala
+                  content = content[:brace_idx + 1] + bypass_code + content[brace_idx + 1:]
+                  
+                  with open(file_path, "w", encoding="utf-8") as f:
+                      f.write(content)
+                  print("[+] SELinux fsck bypass kodu hizalama sorunu olmadan eklendi!")
+              else:
+                  print("[-] KRİTİK HATA: Fonksiyonun süslü parantezi '{' bulunamadı!")
+                  exit(1)
           else:
-              print("[-] Hedef fonksiyon bulunamadı.")
-          PYEOF
-
-          echo "[+] Sepolicy kuralları işlemi tamamlandı."
-
+              print("[-] KRİTİK HATA: Hedef fonksiyon hooks.c içinde bulunamadı!")
+              exit(1)
       - name: 🔗 Patch for no-kprobe
         uses: ./.github/workflows/patch-no-kprobe
     
