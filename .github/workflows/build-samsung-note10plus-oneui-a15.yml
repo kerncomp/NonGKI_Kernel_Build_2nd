@@ -128,6 +128,54 @@ jobs:
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
 
+      - name: 🛡️ Inject Fake Access Rules to KernelSU
+        shell: python3
+        run: |
+          import os
+          
+          # selinux_hide.c dosyasını sistemde dinamik olarak bulur
+          target_file = None
+          for root, dirs, files in os.walk("."):
+              if "selinux_hide.c" in files:
+                  target_file = os.path.join(root, "selinux_hide.c")
+                  break
+                  
+          if not target_file:
+              print("[-] KRİTİK HATA: selinux_hide.c bulunamadı!")
+              exit(1)
+              
+          with open(target_file, "r", encoding="utf-8") as f:
+              content = f.read()
+              
+          # my_write_access fonksiyonunun içindeki eşsiz değişken tanımlama satırını bulur
+          search_str = "char *scon = NULL, *tcon = NULL;"
+          
+          # Araya kaynak kod seviyesinde yerleştirilecek C bypass bloğu
+          inject_code = """
+          // ===== EKLENEN SELINUX BYPASS KISMI =====
+          if (strnstr(buf, "u:r:shell:s0", size) && strnstr(buf, "u:r:su:s0", size)) {
+              return scnprintf(buf, SIMPLE_TRANSACTION_LIMIT, "%x %x %x %x %u %x", 0, 0xffffffff, 0, 0xffffffff, 1, 0);
+          }
+          if (strnstr(buf, "u:r:fsck_untrusted:s0", size) && strnstr(buf, "capability", size)) {
+              return scnprintf(buf, SIMPLE_TRANSACTION_LIMIT, "%x %x %x %x %u %x", 0, 0xffffffff, 0, 0xffffffff, 1, 0);
+          }
+          if (strnstr(buf, "u:r:adbd:s0", size) && strnstr(buf, "u:r:adbroot:s0", size)) {
+              return scnprintf(buf, SIMPLE_TRANSACTION_LIMIT, "%x %x %x %x %u %x", 0, 0xffffffff, 0, 0xffffffff, 1, 0);
+          }
+          // ===== EKLENEN BYPASS KISMI SONU =====
+          
+          char *scon = NULL, *tcon = NULL;"""
+          
+          if search_str in content:
+              content = content.replace(search_str, inject_code, 1)
+              with open(target_file, "w", encoding="utf-8") as f:
+                  f.write(content)
+              print("[+] Bypass kodu selinux_hide.c içine başarıyla enjekte edildi!")
+          else:
+              print("[-] HATA: Enjeksiyon noktası bulunamadı, KernelSU sürümü farklı olabilir!")
+              exit(1)
+              
+
       - name: ⚡ Apply No-OC & Stock Voltage Patch
         shell: bash
         run: |
@@ -222,40 +270,6 @@ jobs:
       - name: 🪝 Patch Kernel of SUSFS
         uses: ./.github/workflows/patch-susfs
         
-      - name: 🛡️ Hardcode SELinux fsck_untrusted Bypass (Robust)
-        shell: python
-        run: |
-          import os
-
-          file_path = "device_kernel/security/selinux/hooks.c"
-          with open(file_path, "r", encoding="utf-8") as f:
-              content = f.read()
-
-          # Sadece fonksiyonun benzersiz imzasını arıyoruz, boşluklara takılmıyoruz
-          func_signature = "static int selinux_capable("
-          
-          if func_signature in content:
-              func_idx = content.find(func_signature)
-              # Fonksiyon imzasından sonraki İLK açılış süslü parantezini bul
-              brace_idx = content.find("{", func_idx)
-              
-              if brace_idx != -1:
-                  # \n ve \t ile C dilinin doğal formatlamasını kullanıyoruz
-                  bypass_code = "\n\t/* fsck_untrusted sys_admin bypass */\n\tif (cap == CAP_SYS_ADMIN && !strncmp(current->comm, \"fsck\", 4))\n\t\treturn 0;\n"
-                  
-                  # Parantezden hemen sonrasına bypass kodunu zımbala
-                  content = content[:brace_idx + 1] + bypass_code + content[brace_idx + 1:]
-                  
-                  with open(file_path, "w", encoding="utf-8") as f:
-                      f.write(content)
-                  print("[+] SELinux fsck bypass kodu hizalama sorunu olmadan eklendi!")
-              else:
-                  print("[-] KRİTİK HATA: Fonksiyonun süslü parantezi '{' bulunamadı!")
-                  exit(1)
-          else:
-              print("[-] KRİTİK HATA: Hedef fonksiyon hooks.c içinde bulunamadı!")
-              exit(1)
-              
       - name: 🔗 Patch for no-kprobe
         uses: ./.github/workflows/patch-no-kprobe
     
