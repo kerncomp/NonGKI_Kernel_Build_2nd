@@ -127,6 +127,20 @@ jobs:
 
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
+
+      - name: ⚡ Apply No-OC & Stock Voltage Patch
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          echo "[+] Undervolt ve No-OC yaması indiriliyor..."
+          curl -sL "https://github.com/maelmsss/exynos982x_kernel/compare/main...Devandroid-bit:exynos982x_kernel:devandroid-no-oc-stock-voltage.patch" -o undervolt.patch
+          
+          echo "[+] Yama çekirdeğe işleniyor..."
+          # Satır sonu uyumsuzluklarını (CRLF) temizle
+          sed -i 's/\r$//' undervolt.patch
+          
+          # Yamayı kodlara zorla bas
+          patch -t -N -p1 --fuzz=3 < undervolt.patch || true
           
       - name: ⚖️ Apply & Fix SBalance Patch (4.14 Backport)
         shell: bash
