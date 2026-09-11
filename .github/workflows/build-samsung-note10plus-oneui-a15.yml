@@ -128,6 +128,18 @@ jobs:
       - name: ⚙️ Get neccssary tools
         uses: ./.github/workflows/build-ready
 
+      - name: 🛡️ Hardcode SELinux fsck_untrusted Bypass
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          echo "[+] security/selinux/hooks.c içine SYS_ADMIN bypass'ı ekleniyor..."
+          
+          # selinux_capable fonksiyonunun başlangıç süslü parantezine ({) hedef odaklı enjeksiyon
+          sed -i '/static int selinux_capable(/,/^{/ s/^{/{\n\t\/* fsck_untrusted sys_admin bypass *\/\n\tif (cap == CAP_SYS_ADMIN \&\& !strncmp(current->comm, "fsck", 4))\n\t\treturn 0;/' security/selinux/hooks.c
+          
+          echo "[+] Çekirdek içi SELinux kör noktası başarıyla oluşturuldu!"
+
       - name: ⚡ Apply No-OC & Stock Voltage Patch
         shell: bash
         run: |
