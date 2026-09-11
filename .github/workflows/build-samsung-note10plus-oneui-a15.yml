@@ -223,7 +223,7 @@ jobs:
         uses: ./.github/workflows/patch-susfs
         
       - name: 🛡️ Hardcode SELinux fsck_untrusted Bypass (Robust)
-        shell: python3
+        shell: python
         run: |
           import os
 
@@ -255,6 +255,7 @@ jobs:
           else:
               print("[-] KRİTİK HATA: Hedef fonksiyon hooks.c içinde bulunamadı!")
               exit(1)
+              
       - name: 🔗 Patch for no-kprobe
         uses: ./.github/workflows/patch-no-kprobe
     
