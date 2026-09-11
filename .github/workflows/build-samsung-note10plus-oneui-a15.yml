@@ -222,6 +222,56 @@ jobs:
       - name: 🪝 Patch Kernel of SUSFS
         uses: ./.github/workflows/patch-susfs
 
+      - name: 🔧 Add sepolicy rules to selinux_hide.c
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          FILE="drivers/kernelsu/feature/selinux_hide.c"
+
+          if [ ! -f "$FILE" ]; then
+            echo "[-] selinux_hide.c bulunamadı: $FILE"
+            exit 0
+          fi
+
+          # Zaten eklenmiş mi kontrol et
+          if grep -q "fsck_sys_admin_args" "$FILE"; then
+            echo "[+] Kurallar zaten ekli, atlanıyor."
+            exit 0
+          fi
+
+          echo "[+] Sepolicy kuralları ekleniyor..."
+
+          # Fonksiyon gövdesinin içine ekle (init fonksiyonundan önce)
+          python3 - << 'PYEOF'
+          import re
+          path = "drivers/kernelsu/feature/selinux_hide.c"
+          with open(path, "r") as f:
+              data = f.read()
+
+          insertion = '''
+          const char *adbroot_args[] = { "adbroot", "domain" };
+          ksu_add_shit_to_list(KSU_SEPOLICY_CMD_TYPE, adbroot_args);
+
+          const char *fsck_sys_admin_args[] = { "fsck_untrusted", "fsck_untrusted", "capability", "sys_admin" };
+          ksu_add_shit_to_list(KSU_SEPOLICY_CMD_XPERM, fsck_sys_admin_args);
+
+          const char *shell_su_args[] = { "shell", "su", "process", "transition" };
+          ksu_add_shit_to_list(KSU_SEPOLICY_CMD_TYPE_TRANSITION, shell_su_args);
+          '''
+
+          # ksu_selinux_hide_handle_post_fs_data fonksiyonunun içine ekle
+          pattern = r"(void\s+ksu_selinux_hide_handle_post_fs_data\s*\(\s*\)\s*\{)"
+          if re.search(pattern, data):
+              data = re.sub(pattern, r"\1" + insertion, data, count=1)
+              with open(path, "w") as f:
+                  f.write(data)
+              print("[+] Kurallar eklendi.")
+          else:
+              print("[-] Hedef fonksiyon bulunamadı.")
+          PYEOF
+
+          echo "[+] Sepolicy kuralları işlemi tamamlandı."
+
       - name: 🔗 Patch for no-kprobe
         uses: ./.github/workflows/patch-no-kprobe
     
