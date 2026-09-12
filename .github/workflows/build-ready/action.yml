@@ -280,6 +280,10 @@ runs:
               patch -p1 < <(curl -sL "https://github.com/midori01/KernelSU/commit/resuki.patch")
 
               echo "[+] Resukisu susfs applied."
+              
+              # Geliştiricinin koyduğu Non-GKI durdurma hatasını Kbuild dosyasından siler
+              sed -i '/TP hooks are incompatible/d' Kbuild
+              echo "[+] Non-GKI Kbuild kısıtlaması kaldırıldı."
             fi
             
           else
