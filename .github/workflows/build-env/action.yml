@@ -131,7 +131,8 @@ runs:
             # Get MKDTBO tool to System
             mkdir $GITHUB_WORKSPACE/mkdtbo
             cd $GITHUB_WORKSPACE/mkdtbo
-            ${{ env.CURLX }} https://android.googlesource.com/platform/system/libufdt/+archive/refs/heads/main/utils/src.tar.gz src.tar.gz
+            # DÜZELTME: main yerine master kullanıldı
+            ${{ env.CURLX }} https://android.googlesource.com/platform/system/libufdt/+archive/master/utils/src.tar.gz src.tar.gz
             tar zxvf src.tar.gz
             rm -f src.tar.gz
             ln -s mkdtboimg.py /usr/bin/mkdtboimg
@@ -181,11 +182,12 @@ runs:
             # Get MKDTBO tool to System
             mkdir $GITHUB_WORKSPACE/mkdtbo
             cd $GITHUB_WORKSPACE/mkdtbo
-            ${{ env.CURLX }} https://android.googlesource.com/platform/system/libufdt/+archive/refs/heads/main/utils/src.tar.gz src.tar.gz
+            # DÜZELTME: main yerine master kullanıldı
+            ${{ env.CURLX }} https://android.googlesource.com/platform/system/libufdt/+archive/master/utils/src.tar.gz src.tar.gz
             tar zxvf src.tar.gz
             rm -f src.tar.gz
-            sudo ln -s mkdtboimg.py /usr/bin/mkdtboimg
-            sudo ln -s mkdtboimg.py /usr/bin/mkdtimg
+            ln -s mkdtboimg.py /usr/bin/mkdtboimg
+            ln -s mkdtboimg.py /usr/bin/mkdtimg
             cd $GITHUB_WORKSPACE
 
             if [ "${{ env.PYTHON_VERSION }}" == "3" ]; then
@@ -235,11 +237,12 @@ runs:
             # Get MKDTBO tool to System
             mkdir $GITHUB_WORKSPACE/mkdtbo
             cd $GITHUB_WORKSPACE/mkdtbo
-            ${{ env.CURLX }} https://android.googlesource.com/platform/system/libufdt/+archive/refs/heads/main/utils/src.tar.gz src.tar.gz
+            # DÜZELTME: main yerine master kullanıldı
+            ${{ env.CURLX }} https://android.googlesource.com/platform/system/libufdt/+archive/master/utils/src.tar.gz src.tar.gz
             tar zxvf src.tar.gz
             rm -f src.tar.gz
-            sudo ln -s mkdtboimg.py /usr/bin/mkdtboimg
-            sudo ln -s mkdtboimg.py /usr/bin/mkdtimg
+            ln -s mkdtboimg.py /usr/bin/mkdtboimg
+            ln -s mkdtboimg.py /usr/bin/mkdtimg
             cd $GITHUB_WORKSPACE
 
             if [ "${{ env.PYTHON_VERSION }}" == "3" ]; then
@@ -290,7 +293,8 @@ runs:
             # Get MKDTBO tool to System
             mkdir $GITHUB_WORKSPACE/mkdtbo
             cd $GITHUB_WORKSPACE/mkdtbo
-            ${{ env.CURLX }} https://android.googlesource.com/platform/system/libufdt/+archive/refs/heads/main/utils/src.tar.gz src.tar.gz
+            # DÜZELTME: main yerine master kullanıldı
+            ${{ env.CURLX }} https://android.googlesource.com/platform/system/libufdt/+archive/master/utils/src.tar.gz src.tar.gz
             tar zxvf src.tar.gz
             rm -f src.tar.gz
             ln -s mkdtboimg.py /usr/bin/mkdtboimg
