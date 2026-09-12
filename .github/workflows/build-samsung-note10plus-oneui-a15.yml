@@ -348,6 +348,21 @@ jobs:
           else:
               print("[-] HATA: sscanf satiri bulunamadi.")
               exit(1)
+
+      - name: 🩹 Apply SuSFS and KernelSU Inline Patches
+        working-directory: . 
+        run: |
+          wget -q https://raw.githubusercontent.com/midori01/gki_ksu_workflow/refs/heads/main/.github/scripts/susfs_deinlined.sh
+          chmod +x susfs_deinlined.sh
+          
+          # Değişken (ENV) aramak yerine doğrudan 4.14 sürümü sabitlendi
+          ./susfs_deinlined.sh susfs_patch_to_4.14.patch deinlined.patch
+          patch -p1 < deinlined.patch
+
+          cd KernelSU 
+          # Not: "xx" kısmını uygulamak istediğin gerçek commit hash'i ile değiştirmeyi unutma
+          patch -p1 < <(curl -sL "https://github.com/midori01/KernelSU/commit/resuki.patch")
+          cd ..
               
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
