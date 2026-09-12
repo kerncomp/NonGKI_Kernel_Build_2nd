@@ -83,7 +83,7 @@ runs:
               ./susfs_deinlined.sh susfs_patch_to_${{ env.KERNEL_VERSION }}.patch deinlined.patch
               patch -p1 < deinlined.patch || true
             else
-              patch -p1 < susfs_patch_to_${{ env.KERNEL_VERSION }}.patch || true
+              patch -p1 < susfs_patch_to_${{ env.KERNEL_VERSION }}.patch
             fi
 
             echo "[+] SuSFS Patch completed."
