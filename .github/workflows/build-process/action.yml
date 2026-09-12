@@ -9,7 +9,8 @@ runs:
         run: |
           # Get MKDTBO tool to kernel
           cd $GITHUB_WORKSPACE/device_kernel/scripts/dtc
-          ${{ env.CURLX }} https://android.googlesource.com/platform/system/libufdt/+archive/refs/heads/main/utils/src.tar.gz src.tar.gz
+          # DÜZELTME: main yerine master kullanıldı
+          ${{ env.CURLX }} https://android.googlesource.com/platform/system/libufdt/+archive/master/utils/src.tar.gz src.tar.gz
           tar zxvf src.tar.gz
           rm -f src.tar.gz
 
