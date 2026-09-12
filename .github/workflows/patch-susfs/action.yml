@@ -77,10 +77,19 @@ runs:
           else
             cp /tmp/Patches/Patch/susfs_patch_to_${{ env.KERNEL_VERSION }}.patch ./
 
-            patch -p1 < susfs_patch_to_${{ env.KERNEL_VERSION }}.patch || true
+            if [[ "${{ env.KERNELSU_SOURCE }}" == *ReSukiSU* ]] || [[ "${{ env.KERNELSU_AUTO_FORK }}" == "resukisu" ]]; then
+              wget https://raw.githubusercontent.com/midori01/gki_ksu_workflow/refs/heads/main/.github/scripts/susfs_deinlined.sh
+              chmod +x susfs_deinlined.sh
+              ./susfs_deinlined.sh susfs_patch_to_${{ env.KERNEL_VERSION }}.patch deinlined.patch
+              patch -p1 < deinlined.patch || true
+            else
+              patch -p1 < susfs_patch_to_${{ env.KERNEL_VERSION }}.patch || true
+            fi
+
             echo "[+] SuSFS Patch completed."
 
           fi
+
 
           # Patch .rej find
           if [[ "${{ env.BUILD_DEBUGGER }}" == "true" ]]; then
