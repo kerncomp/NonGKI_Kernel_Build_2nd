@@ -282,7 +282,7 @@ runs:
               echo "[+] Resukisu susfs applied."
               
               # Geliştiricinin koyduğu Non-GKI durdurma hatasını Kbuild dosyasından siler
-              sed -i '/TP hooks are incompatible/d' Kbuild
+              find . -type f -name "Kbuild" -exec sed -i '/TP hooks are incompatible/d' {} +
               echo "[+] Non-GKI Kbuild kısıtlaması kaldırıldı."
             fi
             
