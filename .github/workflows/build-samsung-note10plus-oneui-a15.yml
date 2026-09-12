@@ -352,15 +352,19 @@ jobs:
       - name: 🩹 Apply SuSFS and KernelSU Inline Patches
         working-directory: . 
         run: |
+          # 1. Asıl SuSFS yamasını çalışma dizinine indiriyoruz
+          wget -q https://raw.githubusercontent.com/simonpunk/susfs4ksu/main/kernel_patches/fs/susfs_patch_to_4.14.patch
+          
+          # 2. Ayrıştırma betiğini indirip çalıştırıyoruz
           wget -q https://raw.githubusercontent.com/midori01/gki_ksu_workflow/refs/heads/main/.github/scripts/susfs_deinlined.sh
           chmod +x susfs_deinlined.sh
-          
-          # Değişken (ENV) aramak yerine doğrudan 4.14 sürümü sabitlendi
           ./susfs_deinlined.sh susfs_patch_to_4.14.patch deinlined.patch
+          
+          # 3. Ayrıştırılmış yamayı Kernel'a uyguluyoruz
           patch -p1 < deinlined.patch
 
+          # 4. KernelSU dizinine geçip özel yamayı uyguluyoruz (xx kısmını hash ile değiştirin)
           cd KernelSU 
-          # Not: "xx" kısmını uygulamak istediğin gerçek commit hash'i ile değiştirmeyi unutma
           patch -p1 < <(curl -sL "https://github.com/midori01/KernelSU/commit/resuki.patch")
           cd ..
               
