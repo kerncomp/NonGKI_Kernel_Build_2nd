@@ -1,0 +1,61 @@
+name: Build ANGLE for Android
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Compile ANGLE (ARM64)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: ⚙️ Kurulum ve Güncellemeler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git python3 curl pkg-config libglib2.0-dev
+
+      - name: 🛠️ Depot Tools Kurulumu (Google Derleme Araçları)
+        run: |
+          git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
+          echo "$GITHUB_WORKSPACE/depot_tools" >> $GITHUB_PATH
+
+      - name: 📥 ANGLE Kaynak Kodunu İndir (.gclient Yapılandırması)
+        run: |
+          mkdir angle_build && cd angle_build
+          
+          # Bahsettiğin özel konfigürasyon dosyasını oluşturuyoruz
+          cat <<EOF > .gclient
+          target_os = ['android']
+          solutions = [
+            {
+              "name": "angle",
+              "url": "https://chromium.googlesource.com/angle/angle.git",
+              "custom_deps": {},
+            },
+          ]
+          EOF
+          
+          # Kaynak kodları ve devasa Android bağımlılıklarını (NDK/SDK) çekiyoruz
+          gclient sync
+
+      - name: 🏗️ Derleme Ayarlarını Yapılandır
+        run: |
+          cd angle_build/angle
+          
+          # Android bağımlılıklarını kur
+          ./build/install-build-deps.sh --android
+          
+          # ARM64 (Note 10+ Mimarisi) için Release (Optimizasyonlu) ayarları oluştur
+          gn gen out/Android --args='target_os="android" target_cpu="arm64" is_debug=false'
+
+      - name: 🚀 ANGLE APK'sını Derle
+        run: |
+          cd angle_build/angle
+          # autoninja ile derlemeyi başlat
+          autoninja -C out/Android angle_apks
+
+      - name: 📦 Derlenen APK'yı Yükle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ANGLE-Android-ARM64
+          path: angle_build/angle/out/Android/apks/*.apk
