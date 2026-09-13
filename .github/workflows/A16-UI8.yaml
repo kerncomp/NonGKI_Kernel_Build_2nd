@@ -1,0 +1,431 @@
+name: Build Samsung Note 10 Plus (OneUI A15)
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+env:
+  # Device env
+  DEVICE_NAME : "samsung_note_10plus"
+  DEVICE_CODENAME : "d2s"
+
+  CUSTOM_CMDS : "CLANG_TRIPLE=aarch64-linux-gnu-"
+  EXTRA_CMDS : "LLVM=1 LLVM_IAS=1"
+
+  KERNEL_SOURCE : "https://github.com/maelmsss/exynos982x_kernel.git"
+  KERNEL_BRANCH : "main"
+
+  CLANG_SOURCE : "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz"
+  CLANG_BRANCH : ""
+
+  GCC_GNU : false
+  GCC_64_SOURCE : ""
+  GCC_64_BRANCH : ""
+  GCC_32_SOURCE : ""
+  GCC_32_BRANCH : ""
+
+
+  DEFCONFIG_SOURCE: ""
+  DEFCONFIG_NAME : "exynos9820_defconfig"
+  DEFCONFIG_ORIGIN_IMAGE: ""
+  DEFCONFIG_FROM_BOOT: false
+
+  KERNELSU_SOURCE : ""
+  KERNELSU_BRANCH : ""
+
+  KERNELSU_AUTO_GET : "true"
+  KERNELSU_AUTO_FORK : "resukisu" # xxksu, rsuntk , next, resukisu and sukisu
+
+  SUSFS_ENABLE : true
+  SUSFS_FIXED : true
+  
+  AK3_SOURCE : "https://github.com/osm0sis/AnyKernel3.git"
+  AK3_BRANCH : "master"
+
+  BOOT_SOURCE : ""
+
+  NEED_DTBO : false
+  NEED_SAFE_DTBO : false
+
+  ROM_TEXT : "oneui_a15"
+
+  # Other env
+  PYTHON_VERSION: "3" # Only 2(Ubuntu 22.04 and Ubuntu 20.04) or 3(Any OS Versions).
+
+  PACK_METHOD: "Anykernel3" # Anykernel3 need SOURCE and BRANCH, MKBOOTIMG needn't it.
+  PACK_KMODULES: "false" # if u want pack kernel modules (.ko) into Anykernel3.
+
+  KERNELSU_METHOD: "shell" # shell, manual and only.
+
+  PATCHES_SOURCE: "JackA1ltman/NonGKI_Kernel_Patches" # [your_name]/[your_patch] -> gooder123/NonGKI_Patcher
+  PATCHES_BRANCH: "samsung_kernel" # [your_branch] -> main
+
+  SUSFS_FOLDER_FIXED: "note10_plus_exyons9850" # Fill in your patch prefix directory here. Leave it blank if there isn't one. -> your_folder
+  SUSFS_PATCH_FIXED: "susfs_fixed" # Fill in your patches here. If there are multiple patches, please separate them with a comma. Leave it blank if there isn't one. -> patch1,patch2
+
+  REKERNEL_ENABLE: "false" # if u need Re:Kernel.
+  DROIDSPACES_ENABLE: "false" # if u need Droidspaces or LXC/Docker.
+  NOMOUNT_ENABLE: "false" # if u need NoMount.
+
+  HOOK_METHOD: "syscall" # Manual hook method ->  syscall.
+
+  KERNEL_PATCH: "false" # If your kernel version is <= 4.9, you have the option of enabling the patch to patch the kernel_write and kernel_read functions.
+
+  KPM_ENABLE: "false" # Anyone devices. 
+  KPM_INLINE: "false" # Only use it for SukiSU-Ultra.
+  KPM_KPATCH_NEXT: "false" # If u want hook KPatch-Next in build step.
+  KPM_PATCH_SOURCE: "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" # If u want to use KPM Inline,so you need set patch exec file source -> raw.githubusercontent.com/Test/Test/patch .
+
+  BASEBAND_GUARD_ENABLE: "true" #if u want prevent unauthorized writes to critical partitions/device nodes.
+  BASEBAND_GUARD_BOOT: "false" #if u want to protect boot partition.
+
+  GENERATE_DTB: "false" # if u kernel need DTB , but cannot auto generate it. (Only Anykernel3).
+  GENERATE_CHIP: "qcom" # only supported for qcom and mediatek.
+
+  BUILD_DEBUGGER: "false" # Output build errors.
+  SKIP_PATCH: "false" # Ignore errors found in Patch Debugger.
+
+  BUILD_OTHER_CONFIG: "true" # Merge config files.
+  MERGE_CONFIG_FILES: "d2s.config"
+
+  FREE_MORE_SPACE: "false" # if u want get more space, enabled it.
+
+jobs:
+  build-kernel:
+    name: Samsung Note 10 Plus (OneUI A15)
+    runs-on: ubuntu-latest # u can changed to ubuntu 22.04, and need container set ubuntu-latest
+    # container: archlinux/archlinux:latest # if u need use arch linux -> archlinux/archlinux:latest or ubuntu 20.04 -> ubuntu:focal
+    env:
+      CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
+      CCACHE_NOHASHDIR: "true"
+      CCACHE_HARDLINK: "true"
+      KBUILD_BUILD_TIMESTAMP: "Thu Mar 2 09:32:04 KST 2023"
+      KBUILD_BUILD_USER: "builder"
+      KBUILD_BUILD_HOST: "buildhost"
+
+    steps:
+      - name: ⏰ Checkout repository
+        uses: actions/checkout@v6
+
+      - name: 🛡️ Backup Patches Directory
+        shell: bash
+        run: |
+          echo "[*] Backing up Patches directory to /tmp/Patches_Backup..."
+          cp -r $GITHUB_WORKSPACE/Patches /tmp/Patches_Backup
+          echo "[+] Backup complete. Contents of /tmp/Patches_Backup:"
+          ls -la /tmp/Patches_Backup
+      # ========================================
+
+      - name: 🔍 List Patches directory
+        shell: bash
+        run: |
+          ls -la $GITHUB_WORKSPACE/Patches/ || echo "[-] Patches not found in Workspace (already backed up)"
+          echo "---"
+          find /tmp/Patches_Backup -maxdepth 2 -type f
+
+      - name: ⌛️ Compilation environment preparation
+        uses: ./.github/workflows/build-env
+
+      - name: ⚙️ Get necessary tools
+        uses: ./.github/workflows/build-ready
+
+      - name: ⚡ Apply No-OC & Undervolt Patch
+        shell: bash
+        run: |
+          # Switching to kernel directory
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          echo "[*] Downloading No-OC & Undervolt patch..."
+          curl -sL "https://github.com/maelmsss/exynos982x_kernel/compare/main...Devandroid-bit:exynos982x_kernel:Devandroid-bit-no-oc-undervolt.patch" -o no_oc_undervolt.patch
+          
+          echo "[*] Applying patch to kernel source..."
+          patch -p1 < no_oc_undervolt.patch
+          
+          echo "[+] Patch applied successfully!"
+          
+      - name: ⚖️ Apply & Fix SBalance Patch (4.14 Backport)
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          echo "[*] Searching for SBalance patch in backup directory (/tmp/Patches_Backup)..."
+          PATCH_FILE=$(find /tmp/Patches_Backup -name "sbalance.patch" 2>/dev/null | head -n 1)
+          
+          if [ -z "$PATCH_FILE" ]; then
+              echo "[-] CRITICAL ERROR: sbalance.patch not found in backup directory!"
+              exit 1
+          fi
+          
+          echo "[+] Patch found: $PATCH_FILE"
+          sed -i 's/\r$//' "$PATCH_FILE"
+          
+          # 1. Clean up old .rej files
+          find . -name "*.rej" -type f -delete
+          
+          # 2. Apply patch with fuzz factor (--fuzz=3)
+          echo "[*] Applying patch to kernel..."
+          patch -t -N -p1 --fuzz=3 < "$PATCH_FILE" || true
+          
+          # 3. STRICT CHECK (Stop process if any hunk is rejected)
+          if find . -name "*.rej" | grep -q .; then
+              echo "[-] CRITICAL ERROR: SBalance patch did not apply cleanly!"
+              echo "[-] Rejected hunks:"
+              find . -name "*.rej" -exec cat {} \;
+              exit 1
+          fi
+          
+          # Safe Makefile Fix
+          echo "[*] Adding sbalance.o to Makefile..."
+          if ! grep -q "sbalance.o" kernel/irq/Makefile; then
+              echo "obj-y += sbalance.o" >> kernel/irq/Makefile
+          fi
+          
+          echo "[*] Fixing SBalance C code for 4.14 architecture..."
+          sed -i '1s/^/#include <linux\/cpufreq.h>\n/' kernel/irq/sbalance.c
+          sed -i 's/arch_scale_cpu_capacity(cpu)/arch_scale_cpu_capacity(NULL, cpu)/g' kernel/irq/sbalance.c
+          echo -e "\n\t}\n}" >> kernel/irq/sbalance.c
+          
+          echo "[+] SBalance patch and backport fix completed successfully!"
+
+      - name: ⚙️ Custom Scheduler Optimizations (Hardcoded & Locked)
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          echo "[*] Processing Kconfig settings..."
+          find arch/arm64/configs -type f -name "*defconfig" -exec sh -c '
+              sed -i "/CONFIG_DEFAULT_CFQ/d" "{}"
+              sed -i "/CONFIG_DEFAULT_IOSCHED/d" "{}"
+              echo "CONFIG_IOSCHED_NOOP=y" >> "{}"
+              echo "CONFIG_DEFAULT_NOOP=y" >> "{}"
+              echo "CONFIG_DEFAULT_IOSCHED=\"noop\"" >> "{}"
+              
+              echo "CONFIG_NET_SCHED=y" >> "{}"
+              echo "CONFIG_NET_SCH_FQ_CODEL=y" >> "{}"
+              echo "CONFIG_DEFAULT_FQ_CODEL=y" >> "{}"
+              echo "CONFIG_NET_SCH_DEFAULT=y" >> "{}"
+              sed -i "/CONFIG_DEFAULT_NET_SCH/d" "{}"
+              echo "CONFIG_DEFAULT_NET_SCH=\"fq_codel\"" >> "{}"
+              
+              echo "CONFIG_TCP_CONG_ADVANCED=y" >> "{}"
+              echo "CONFIG_TCP_CONG_CUBIC=y" >> "{}"
+              echo "CONFIG_DEFAULT_CUBIC=y" >> "{}"
+              sed -i "/CONFIG_DEFAULT_TCP_CONG/d" "{}"
+              echo "CONFIG_DEFAULT_TCP_CONG=\"cubic\"" >> "{}"
+          ' \;
+
+          echo "[*] Hardcoding fq_codel into source..."
+          # 1. Replace pfifo_fast with fq_codel in source code
+          sed -i 's/"pfifo_fast"/"fq_codel"/g' net/sched/sch_generic.c
+          
+          echo "[+] Optimizations locked into kernel successfully!"
+          
+      - name: 🪝 Patch Kernel of SUSFS
+        uses: ./.github/workflows/patch-susfs
+        
+      - name: 🔗 Patch for no-kprobe
+        uses: ./.github/workflows/patch-no-kprobe
+    
+      - name: 🧩 Patch Kernel of NoMount
+        shell: bash
+        run: |
+          set -x
+          cd $GITHUB_WORKSPACE/device_kernel
+          # Fetch and run official setup.sh script from master branch
+          curl -sSL https://raw.githubusercontent.com/maxsteeel/nomount/master/kernel/setup.sh -o /tmp/nomount_setup.sh
+          chmod +x /tmp/nomount_setup.sh
+          sh /tmp/nomount_setup.sh
+          # Add NoMount config to defconfig
+          echo "CONFIG_NOMOUNT=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          echo "[+] NoMount integration completed."
+          
+      - name: 🧰 Patch Kernel of Re:Kernel
+        if: env.REKERNEL_ENABLE == 'true'
+        uses: ./.github/workflows/patch-rekernel
+
+      - name: 🛠️ Fix Re-Kernel TRANSACTION conflict
+        if: env.REKERNEL_ENABLE == 'true'
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          sed -i 's/\bTRANSACTION\b/REKERNEL_TRANSACTION/g' include/net/rekernel.h
+          
+      - name: 💿 Patch Kernel of Droidspaces
+        uses: ./.github/workflows/patch-droidspaces
+            
+      - name: ➕ Add Non-GKI configs to defconfig
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          DEFCONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+          
+          cat >> "$DEFCONFIG_FILE" << 'EOF'
+          
+          CONFIG_IRQ_SBALANCE=y
+          CONFIG_SBALANCE_EXCLUDE_CPUS=""
+          CONFIG_IRQ_SBALANCE_POLL_MSEC=1000
+          CONFIG_SCHED_BORE=y
+          CONFIG_KPM=y
+          
+          EOF
+          
+      - name: 🔒 Patch Kernel of Baseband Guard
+        uses: ./.github/workflows/patch-baseband-guard
+
+      - name: 🛡️ Inject Fake Access Rules to KernelSU V2
+        shell: python
+        run: |
+          import os
+          import re
+          
+          target = None
+          for root, dirs, files in os.walk("."):
+              if "selinux_hide.c" in files:
+                  target = os.path.join(root, "selinux_hide.c")
+                  break
+          
+          if not target:
+              print("[-] ERROR: selinux_hide.c not found!")
+              exit(1)
+              
+          with open(target, "r", encoding="utf-8") as f:
+              content = f.read()
+          
+          inject = """
+              /* ===== ADDED STRICT BYPASS ===== */
+              if (strcmp(scon, "u:r:fsck_untrusted:s0") == 0 && strcmp(tcon, "u:r:fsck_untrusted:s0") == 0) {
+                  length = scnprintf(buf, SIMPLE_TRANSACTION_LIMIT, "%x %x %x %x %u %x", 0, 0xffffffff, 0, 0xffffffff, 1, 0);
+                  goto out;
+              }
+              if (strcmp(scon, "u:r:shell:s0") == 0 && strcmp(tcon, "u:r:su:s0") == 0) {
+                  length = scnprintf(buf, SIMPLE_TRANSACTION_LIMIT, "%x %x %x %x %u %x", 0, 0xffffffff, 0, 0xffffffff, 1, 0);
+                  goto out;
+              }
+              if (strcmp(scon, "u:r:adbd:s0") == 0 && strcmp(tcon, "u:r:adbroot:s0") == 0) {
+                  length = scnprintf(buf, SIMPLE_TRANSACTION_LIMIT, "%x %x %x %x %u %x", 0, 0xffffffff, 0, 0xffffffff, 1, 0);
+                  goto out;
+              }
+              /* ================================ */
+          """
+          
+          pattern = re.compile(r'(if\s*\(\s*sscanf\s*\(\s*buf,\s*"%s\s+%s\s+%hu",\s*scon,\s*tcon,\s*&tclass\s*\)\s*!=\s*3\s*\)\s*goto\s*out;)')
+          
+          if pattern.search(content):
+              content = pattern.sub(r'\g<1>\n' + inject, content, count=1)
+              with open(target, "w", encoding="utf-8") as f:
+                  f.write(content)
+              print("[+] V2 Bypass code successfully injected!")
+          else:
+              print("[-] ERROR: sscanf line not found.")
+              exit(1)
+              
+      - name: 🚀 Build Process
+        uses: ./.github/workflows/build-process
+          
+      - name: 🧷 Setup KPatch-Next tools
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          KPATCH_VER=$(curl -s https://api.github.com/repos/KernelSU-Next/KPatch-Next/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
+          echo "[+] KPatch-Next version: $KPATCH_VER"
+          echo "KPATCH_VER=$KPATCH_VER" >> $GITHUB_ENV
+          curl -Lo kptools https://github.com/KernelSU-Next/KPatch-Next/releases/download/${KPATCH_VER}/kptools-linux
+          curl -Lo kpimg https://github.com/KernelSU-Next/KPatch-Next/releases/download/${KPATCH_VER}/kpimg-linux
+          curl -Lo kpatch-android https://github.com/KernelSU-Next/KPatch-Next/releases/download/${KPATCH_VER}/kpatch-android
+          chmod +x kptools kpimg kpatch-android
+          ./kptools --version || true
+          
+      - name: 🩹 Patch Kernel Image with KPatch-Next
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          IMAGE=out/arch/arm64/boot/Image
+          PATCHED_IMAGE=out/arch/arm64/boot/Image.kp
+          if [ ! -f "$IMAGE" ]; then
+            echo "[-] Kernel Image not found ($IMAGE), skipping KPatch."
+            exit 0
+          fi
+          ./kptools -i "$IMAGE" -l || true
+          ./kptools -p -i "$IMAGE" -k ./kpimg -o "$PATCHED_IMAGE"
+          echo "KPATCH_PATCHED=true" >> $GITHUB_ENV
+          echo "[+] Kernel Image patched with KPatch-Next: $PATCHED_IMAGE"
+          
+      - name: 📝 Save build metadata
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          mkdir -p build/out/meta
+          {
+            echo "KPatch-Next Version: $KPATCH_VER"
+          } > build/out/meta/build-info.txt
+          echo "[+] build-info.txt created."
+          
+      - name: ❗ Samsung Kernel Pack Process
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          TIME=$(date +"%Y%m%d%H%M%S")
+          KERNEL_PATH=build/out/d2s/Image
+          KERNEL_OFFSET=0x00008000
+          RAMDISK_OFFSET=0xF0000000
+          SECOND_OFFSET=0xF0000000
+          TAGS_OFFSET=0x00000100
+          BASE=0x10000000
+          CMDLINE='loop.max_part=7'
+          HASHTYPE=sha1
+          HEADER_VERSION=1
+          OS_PATCH_LEVEL=2025-08
+          OS_VERSION=16.0.0
+          PAGESIZE=2048
+          RAMDISK=build/out/d2s/ramdisk.cpio.gz
+          OUTPUT_FILE=build/out/d2s/boot.img
+          BOARD=SRPSC14B009KU
+          
+          mkdir -p build/out/d2s/zip/files
+          mkdir -p build/out/d2s/zip/META-INF/com/google/android
+          
+          # Include kpatch-android tool in package if KPatch-Next is used
+          if [ -f out/arch/arm64/boot/Image.kp ]; then
+            cp -f out/arch/arm64/boot/Image.kp build/out/d2s/Image
+            echo "[+] Using kernel image patched with KPatch-Next."
+          else
+            cp -f out/arch/arm64/boot/Image build/out/d2s/Image
+          fi
+          
+          ./toolchain/mkdtimg cfg_create build/out/d2s/dtb.img build/dtconfigs/exynos9825.cfg -d out/arch/arm64/boot/dts/exynos
+          ./toolchain/mkdtimg cfg_create build/out/d2s/dtbo.img build/dtconfigs/d2s.cfg -d out/arch/arm64/boot/dts/samsung
+          
+          pushd build/ramdisk > /dev/null
+          find . ! -name . | LC_ALL=C sort | cpio -o -H newc -R root:root | gzip > ../out/d2s/ramdisk.cpio.gz || abort
+          popd > /dev/null
+          
+          ./toolchain/mkbootimg --base $BASE --board $BOARD --cmdline "$CMDLINE" --hashtype $HASHTYPE --header_version $HEADER_VERSION --kernel $KERNEL_PATH --kernel_offset $KERNEL_OFFSET --os_patch_level $OS_PATCH_LEVEL --os_version $OS_VERSION --pagesize $PAGESIZE --ramdisk $RAMDISK --ramdisk_offset $RAMDISK_OFFSET --second_offset $SECOND_OFFSET --tags_offset $TAGS_OFFSET -o $OUTPUT_FILE
+          
+          cp build/out/d2s/boot.img build/out/d2s/zip/files/boot.img
+          cp build/out/d2s/dtb.img build/out/d2s/zip/files/dtb.img
+          cp build/out/d2s/dtbo.img build/out/d2s/zip/files/dtbo.img
+          cp build/update-binary build/out/d2s/zip/META-INF/com/google/android/update-binary
+          cp build/updater-script build/out/d2s/zip/META-INF/com/google/android/updater-script
+          
+          if [ -f kpatch-android ]; then
+            cp kpatch-android build/out/d2s/zip/files/kpatch-android
+          fi
+          
+          # Add KPatch-Next build metadata file to zip root
+          if [ -f build/out/meta/build-info.txt ]; then
+            cp build/out/meta/build-info.txt build/out/d2s/zip/build-info.txt
+            echo "[+] build-info.txt added to zip package."
+          fi
+          
+          mkdir tmp
+          cp -rp ./build/out/d2s/zip/* tmp
+          cd tmp
+          zip -r9 tmp.zip *
+          cd ..
+          cp -fp tmp/tmp.zip ${{ env.DEVICE_CODENAME }}-${{ env.ROM_TEXT }}-$TIME-${{ env.PACK_METHOD }}.zip
+          rm -rf tmp
+          echo "PACK_NAME=${{ env.DEVICE_CODENAME }}-${{ env.ROM_TEXT }}-$TIME-${{ env.PACK_METHOD }}.zip" >> $GITHUB_ENV
+          
+      - name: ✏️ Upload Artifacts
+        uses: ./.github/workflows/upload-files
