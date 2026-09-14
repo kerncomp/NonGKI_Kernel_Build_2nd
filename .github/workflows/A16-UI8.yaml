@@ -259,6 +259,7 @@ jobs:
           cd $GITHUB_WORKSPACE/device_kernel
           DEFCONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           
+          # 1. Configleri ekle
           cat >> "$DEFCONFIG_FILE" << 'EOF'
           
           CONFIG_IRQ_SBALANCE=y
@@ -268,6 +269,10 @@ jobs:
           CONFIG_KPM=y
           
           EOF
+          
+          # 2. Disabled
+          sed -i '/CONFIG_KSU_SUSFS_SPOOF_UNAME/d' "$DEFCONFIG_FILE"
+          echo "# CONFIG_KSU_SUSFS_SPOOF_UNAME is not set" >> "$DEFCONFIG_FILE"
           
       - name: 🔒 Patch Kernel of Baseband Guard
         uses: ./.github/workflows/patch-baseband-guard
