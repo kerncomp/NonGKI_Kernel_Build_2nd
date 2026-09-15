@@ -210,8 +210,8 @@ jobs:
         uses: ./.github/workflows/patch-droidspaces
             
       - name: ➕ Add Non-GKI configs to defconfig
-          shell: bash
-          run: |
+        shell: bash
+        run: |
             cd $GITHUB_WORKSPACE/device_kernel
             DEFCONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
             
@@ -246,6 +246,22 @@ jobs:
             # 3. Spoof Uname 
             sed -i '/CONFIG_KSU_SUSFS_SPOOF_UNAME/d' "$DEFCONFIG_FILE"
             echo "# CONFIG_KSU_SUSFS_SPOOF_UNAME is not set" >> "$DEFCONFIG_FILE"
+
+      - name: ⚡ Optimize Schedutil for Exynos Performance
+        shell: bash
+        run: |
+            cd $GITHUB_WORKSPACE/device_kernel
+            SCHEDUTIL_FILE="kernel/sched/cpufreq_schedutil.c"
+            
+            echo "[+] Optimizing schedutil rate limits..."
+            
+            # 1. Set up_rate_limit_us to 500us for instant wake-up (zero delay on touch)
+            sed -i 's/tunables->up_rate_limit_us = cpufreq_policy_transition_delay_us(policy);/tunables->up_rate_limit_us = 500;/g' "$SCHEDUTIL_FILE"
+            
+            # 2. Set down_rate_limit_us to 20000us to prevent micro-stutters during scrolling
+            sed -i 's/tunables->down_rate_limit_us = cpufreq_policy_transition_delay_us(policy);/tunables->down_rate_limit_us = 20000;/g' "$SCHEDUTIL_FILE"
+            
+            echo "[+] Schedutil optimization applied successfully."
           
       - name: 🔒 Patch Kernel of Baseband Guard
         uses: ./.github/workflows/patch-baseband-guard
