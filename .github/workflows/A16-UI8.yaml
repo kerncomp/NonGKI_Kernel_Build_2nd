@@ -259,6 +259,34 @@ jobs:
             
             sed -i '/static int dbg_snapshot_add_bl_item_info/,/^}/d' include/linux/debug-snapshot.h
 
+      - name: 🛠️ Inject Dummy Stubs for Missing Samsung Debug Symbols
+        shell: bash
+        run: |
+            cd $GITHUB_WORKSPACE/device_kernel
+            
+            echo "[+] Creating dummy stubs for undefined Samsung debug symbols..."
+            
+            # LLD Linker'in bulamadığı tüm Samsung debug fonksiyonlarının içini boşaltıp sahte (dummy) bir C dosyası yaratıyoruz.
+            cat > arch/arm64/kernel/samsung_dummy_stubs.c << 'EOF'
+            long dbg_snapshot_print_notifier_call() { return 0; }
+            long dbg_snapshot_save_log() { return 0; }
+            long adv_tracer_arraydump() { return 0; }
+            long sec_debug_set_task_in_soft_lockup() { return 0; }
+            long sec_debug_set_cpu_in_soft_lockup() { return 0; }
+            long sec_debug_set_cpu_in_hard_lockup() { return 0; }
+            long sec_debug_set_task_in_hard_lockup() { return 0; }
+            long s3c2410wdt_set_emergency_reset() { return 0; }
+            long exynos_err_parse() { return 0; }
+            long exynos_dump_common_cpu_reg() { return 0; }
+            EOF
+            
+            # Bu yeni sahte dosyayı Kernel derleme sistemine (Makefile) ekliyoruz.
+            # '-w' parametresi ile derleyicinin bu boş fonksiyonlar için 'warning' (uyarı) vermesini de engelliyoruz.
+            echo "CFLAGS_samsung_dummy_stubs.o := -w" >> arch/arm64/kernel/Makefile
+            echo "obj-y += samsung_dummy_stubs.o" >> arch/arm64/kernel/Makefile
+            
+            echo "[+] Dummy stubs injected successfully."
+
       - name: ⚡ Optimize Schedutil for Exynos Performance
         shell: bash
         run: |
