@@ -255,6 +255,9 @@ jobs:
             # 3. Spoof Uname 
             sed -i '/CONFIG_KSU_SUSFS_SPOOF_UNAME/d' "$DEFCONFIG_FILE"
             echo "# CONFIG_KSU_SUSFS_SPOOF_UNAME is not set" >> "$DEFCONFIG_FILE"
+            echo "[+] Patching debug-snapshot.h to fix bcmdhd unused function error..."
+            
+            sed -i '/static int dbg_snapshot_add_bl_item_info/,/^}/d' include/linux/debug-snapshot.h
 
       - name: ⚡ Optimize Schedutil for Exynos Performance
         shell: bash
