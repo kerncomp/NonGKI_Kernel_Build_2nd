@@ -150,7 +150,7 @@ jobs:
 
             echo "[*] Processing Kconfig settings..."
             find arch/arm64/configs -type f -name "*defconfig" -exec sh -c '
-                # --- Once blk-mq bagimliligini zorla ac (SSG bunsuz sessizce dusuyor) ---
+                # --- Once blk-mq ---
                 sed -i "/CONFIG_BLK_MQ_PCI/d" "{}"
                 sed -i "/^# CONFIG_BLK_MQ is not set/d" "{}"
                 sed -i "/^CONFIG_BLK_MQ=/d" "{}"
@@ -158,7 +158,7 @@ jobs:
                 echo "CONFIG_BLK_MQ=y" >> "{}"
                 echo "CONFIG_SCSI_MQ_DEFAULT=y" >> "{}"
 
-                # I/O Scheduler Temizligi ve SSG Ayarlari
+                # I/O Scheduler
                 sed -i "/CONFIG_DEFAULT_CFQ/d" "{}"
                 sed -i "/CONFIG_DEFAULT_NOOP/d" "{}"
                 sed -i "/CONFIG_DEFAULT_IOSCHED/d" "{}"
@@ -188,7 +188,7 @@ jobs:
             sed -i 's/"pfifo_fast"/"fq_codel"/g' net/sched/sch_generic.c
 
             echo "[+] Optimizations locked into kernel successfully!"
-            
+
       - name: 🪝 Patch Kernel of SUSFS
         uses: ./.github/workflows/patch-susfs
         
@@ -239,25 +239,16 @@ jobs:
             # 2.
             sed -i \
               -e 's/CONFIG_SLUB_DEBUG=y/# CONFIG_SLUB_DEBUG is not set/g' \
-              -e 's/CONFIG_FTRACE=y/# CONFIG_FTRACE is not set/g' \
-              -e 's/CONFIG_TRACING=y/# CONFIG_TRACING is not set/g' \
               -e 's/CONFIG_SEC_NAD=y/# CONFIG_SEC_NAD is not set/g' \
-              -e 's/CONFIG_EXYNOS_DEBUG=y/# CONFIG_EXYNOS_DEBUG is not set/g' \
-              -e 's/CONFIG_EXYNOS_ITMON=y/# CONFIG_EXYNOS_ITMON is not set/g' \
               -e 's/CONFIG_EXYNOS_CORESIGHT=y/# CONFIG_EXYNOS_CORESIGHT is not set/g' \
               -e 's/CONFIG_DEBUG_INFO=y/# CONFIG_DEBUG_INFO is not set/g' \
               -e 's/CONFIG_SCHED_DEBUG=y/# CONFIG_SCHED_DEBUG is not set/g' \
               -e 's/CONFIG_SCHED_INFO=y/# CONFIG_SCHED_INFO is not set/g' \
               -e 's/CONFIG_SCHEDSTATS=y/# CONFIG_SCHEDSTATS is not set/g' \
-              -e 's/CONFIG_DEBUG_LIST=y/# CONFIG_DEBUG_LIST is not set/g' \
               -e 's/CONFIG_MALI_DEBUG_SYS=y/# CONFIG_MALI_DEBUG_SYS is not set/g' \
               -e 's/CONFIG_MALI_EXYNOS_DEBUG=y/# CONFIG_MALI_EXYNOS_DEBUG is not set/g' \
               -e 's/CONFIG_ION_DEBUG_EVENT_RECORD=y/# CONFIG_ION_DEBUG_EVENT_RECORD is not set/g' \
               -e 's/CONFIG_MMC_DW_DEBUG=y/# CONFIG_MMC_DW_DEBUG is not set/g' \
-              -e 's/CONFIG_DEBUG_SNAPSHOT=y/# CONFIG_DEBUG_SNAPSHOT is not set/g' \
-              -e 's/CONFIG_EXYNOS_ADV_TRACER=y/# CONFIG_EXYNOS_ADV_TRACER is not set/g' \
-              -e 's/CONFIG_SEC_DEBUG=y/# CONFIG_SEC_DEBUG is not set/g' \
-              -e 's/CONFIG_EXYNOS_DEBUG_TEST=y/# CONFIG_EXYNOS_DEBUG_TEST is not set/g' \
               "$DEFCONFIG_FILE"
               
             # 3. Spoof Uname 
@@ -265,36 +256,6 @@ jobs:
             echo "# CONFIG_KSU_SUSFS_SPOOF_UNAME is not set" >> "$DEFCONFIG_FILE"
             echo "[+] Patching debug-snapshot.h to fix bcmdhd unused function error..."
             
-            sed -i '/static int dbg_snapshot_add_bl_item_info/,/^}/d' include/linux/debug-snapshot.h
-
-      - name: 🛠️ Inject Dummy Stubs for Missing Samsung Debug Symbols
-        shell: bash
-        run: |
-            cd $GITHUB_WORKSPACE/device_kernel
-            
-            echo "[+] Creating dummy stubs for undefined Samsung debug symbols..."
-            
-            # d3
-            cat > arch/arm64/kernel/samsung_dummy_stubs.c << 'EOF'
-            long dbg_snapshot_print_notifier_call() { return 0; }
-            long dbg_snapshot_save_log() { return 0; }
-            long adv_tracer_arraydump() { return 0; }
-            long sec_debug_set_task_in_soft_lockup() { return 0; }
-            long sec_debug_set_cpu_in_soft_lockup() { return 0; }
-            long sec_debug_set_cpu_in_hard_lockup() { return 0; }
-            long sec_debug_set_task_in_hard_lockup() { return 0; }
-            long s3c2410wdt_set_emergency_reset() { return 0; }
-            long exynos_err_parse() { return 0; }
-            long exynos_dump_common_cpu_reg() { return 0; }
-            EOF
-            
-            # d
-            # d2
-            echo "CFLAGS_samsung_dummy_stubs.o := -w" >> arch/arm64/kernel/Makefile
-            echo "obj-y += samsung_dummy_stubs.o" >> arch/arm64/kernel/Makefile
-            
-            echo "[+] Dummy stubs injected successfully."
-
       - name: ⚡ Optimize Schedutil for Exynos Performance
         shell: bash
         run: |
