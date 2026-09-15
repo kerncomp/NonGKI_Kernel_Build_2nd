@@ -150,23 +150,7 @@ jobs:
 
             echo "[*] Processing Kconfig settings..."
             find arch/arm64/configs -type f -name "*defconfig" -exec sh -c '
-                # --- Once blk-mq ---
-                sed -i "/CONFIG_BLK_MQ_PCI/d" "{}"
-                sed -i "/^# CONFIG_BLK_MQ is not set/d" "{}"
-                sed -i "/^CONFIG_BLK_MQ=/d" "{}"
-                sed -i "/CONFIG_SCSI_MQ_DEFAULT/d" "{}"
-                echo "CONFIG_BLK_MQ=y" >> "{}"
-                echo "CONFIG_SCSI_MQ_DEFAULT=y" >> "{}"
-
-                # I/O Scheduler
-                sed -i "/CONFIG_DEFAULT_CFQ/d" "{}"
-                sed -i "/CONFIG_DEFAULT_NOOP/d" "{}"
-                sed -i "/CONFIG_DEFAULT_IOSCHED/d" "{}"
-                echo "CONFIG_MQ_IOSCHED_SSG=y" >> "{}"
-                echo "CONFIG_MQ_IOSCHED_SSG_CGROUP=y" >> "{}"
-                echo "CONFIG_DEFAULT_MQ_IOSCHED_SSG=y" >> "{}"
-                echo "CONFIG_DEFAULT_IOSCHED=\"ssg\"" >> "{}"
-
+                
                 # (Network Scheduler)
                 echo "CONFIG_NET_SCHED=y" >> "{}"
                 echo "CONFIG_NET_SCH_FQ_CODEL=y" >> "{}"
