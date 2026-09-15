@@ -146,35 +146,40 @@ jobs:
       - name: ⚙️ Custom Scheduler Optimizations (Hardcoded & Locked)
         shell: bash
         run: |
-          cd $GITHUB_WORKSPACE/device_kernel
-          
-          echo "[*] Processing Kconfig settings..."
-          find arch/arm64/configs -type f -name "*defconfig" -exec sh -c '
-              sed -i "/CONFIG_DEFAULT_CFQ/d" "{}"
-              sed -i "/CONFIG_DEFAULT_IOSCHED/d" "{}"
-              echo "CONFIG_IOSCHED_NOOP=y" >> "{}"
-              echo "CONFIG_DEFAULT_NOOP=y" >> "{}"
-              echo "CONFIG_DEFAULT_IOSCHED=\"noop\"" >> "{}"
-              
-              echo "CONFIG_NET_SCHED=y" >> "{}"
-              echo "CONFIG_NET_SCH_FQ_CODEL=y" >> "{}"
-              echo "CONFIG_DEFAULT_FQ_CODEL=y" >> "{}"
-              echo "CONFIG_NET_SCH_DEFAULT=y" >> "{}"
-              sed -i "/CONFIG_DEFAULT_NET_SCH/d" "{}"
-              echo "CONFIG_DEFAULT_NET_SCH=\"fq_codel\"" >> "{}"
-              
-              echo "CONFIG_TCP_CONG_ADVANCED=y" >> "{}"
-              echo "CONFIG_TCP_CONG_CUBIC=y" >> "{}"
-              echo "CONFIG_DEFAULT_CUBIC=y" >> "{}"
-              sed -i "/CONFIG_DEFAULT_TCP_CONG/d" "{}"
-              echo "CONFIG_DEFAULT_TCP_CONG=\"cubic\"" >> "{}"
-          ' \;
-
-          echo "[*] Hardcoding fq_codel into source..."
-          # 1. Replace pfifo_fast with fq_codel in source code
-          sed -i 's/"pfifo_fast"/"fq_codel"/g' net/sched/sch_generic.c
-          
-          echo "[+] Optimizations locked into kernel successfully!"
+            cd $GITHUB_WORKSPACE/device_kernel
+            
+            echo "[*] Processing Kconfig settings..."
+            find arch/arm64/configs -type f -name "*defconfig" -exec sh -c '
+                # I/O Scheduler Temizligi ve SSG Ayarlari
+                sed -i "/CONFIG_DEFAULT_CFQ/d" "{}"
+                sed -i "/CONFIG_DEFAULT_NOOP/d" "{}"
+                sed -i "/CONFIG_DEFAULT_IOSCHED/d" "{}"
+                echo "CONFIG_MQ_IOSCHED_SSG=y" >> "{}"
+                echo "CONFIG_MQ_IOSCHED_SSG_CGROUP=y" >> "{}"
+                echo "CONFIG_DEFAULT_MQ_IOSCHED_SSG=y" >> "{}"
+                echo "CONFIG_DEFAULT_IOSCHED=\"ssg\"" >> "{}"
+                
+                # (Network Scheduler)
+                echo "CONFIG_NET_SCHED=y" >> "{}"
+                echo "CONFIG_NET_SCH_FQ_CODEL=y" >> "{}"
+                echo "CONFIG_DEFAULT_FQ_CODEL=y" >> "{}"
+                echo "CONFIG_NET_SCH_DEFAULT=y" >> "{}"
+                sed -i "/CONFIG_DEFAULT_NET_SCH/d" "{}"
+                echo "CONFIG_DEFAULT_NET_SCH=\"fq_codel\"" >> "{}"
+                
+                # (Congestion Control)
+                echo "CONFIG_TCP_CONG_ADVANCED=y" >> "{}"
+                echo "CONFIG_TCP_CONG_CUBIC=y" >> "{}"
+                echo "CONFIG_DEFAULT_CUBIC=y" >> "{}"
+                sed -i "/CONFIG_DEFAULT_TCP_CONG/d" "{}"
+                echo "CONFIG_DEFAULT_TCP_CONG=\"cubic\"" >> "{}"
+            ' \;
+            
+            echo "[*] Hardcoding fq_codel into source..."
+            # 1. Replace pfifo_fast with fq_codel in source code
+            sed -i 's/"pfifo_fast"/"fq_codel"/g' net/sched/sch_generic.c
+            
+            echo "[+] Optimizations locked into kernel successfully!"
           
       - name: 🪝 Patch Kernel of SUSFS
         uses: ./.github/workflows/patch-susfs
@@ -241,6 +246,10 @@ jobs:
               -e 's/CONFIG_MALI_EXYNOS_DEBUG=y/# CONFIG_MALI_EXYNOS_DEBUG is not set/g' \
               -e 's/CONFIG_ION_DEBUG_EVENT_RECORD=y/# CONFIG_ION_DEBUG_EVENT_RECORD is not set/g' \
               -e 's/CONFIG_MMC_DW_DEBUG=y/# CONFIG_MMC_DW_DEBUG is not set/g' \
+              -e 's/CONFIG_DEBUG_SNAPSHOT=y/# CONFIG_DEBUG_SNAPSHOT is not set/g' \
+              -e 's/CONFIG_EXYNOS_ADV_TRACER=y/# CONFIG_EXYNOS_ADV_TRACER is not set/g' \
+              -e 's/CONFIG_SEC_DEBUG=y/# CONFIG_SEC_DEBUG is not set/g' \
+              -e 's/CONFIG_EXYNOS_DEBUG_TEST=y/# CONFIG_EXYNOS_DEBUG_TEST is not set/g' \
               "$DEFCONFIG_FILE"
               
             # 3. Spoof Uname 
