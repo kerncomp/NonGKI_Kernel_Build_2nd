@@ -1,479 +1,290 @@
-#!/bin/bash
-# SPDX-License-Identifier: GPL-3.0-or-later
-# ==============================================================================
-# Script:      susfs_deinlined.sh
-# Description: Converts official SUSFS inline-hook patch to a de-inlined version
-# Author:      midori01 <lv@lvlv.lv>, Gemini
-# Version:     2.1.1
-# Date:        2026-09-14
-# ==============================================================================
-
-set -e
-
-if [ "$1" = "-v" ] || [ "$1" = "--version" ]; then
-    VERSION=$(grep -m1 '^# Version:' "${BASH_SOURCE[0]:-$0}" 2>/dev/null | cut -d: -f2 | xargs)
-    echo "susfs_deinlined.sh v${VERSION:-2.1.1}"
-    exit 0
-fi
-
-if [ "$1" = "-h" ] || [ "$1" = "--help" ] || [ $# -lt 1 ]; then
-    echo "Usage: $0 <official_susfs_patch> [output_patch]"
-    exit 1
-fi
-
-INPUT="$1"
-OUTPUT="${2:-deinlined.patch}"
-
-python3 - "$INPUT" "$OUTPUT" "${BASH_SOURCE[0]:-$0}" << 'EOF'
-import sys
-import os
-import re
-
-def print_script_header_banner(script_path):
-    divider = "=" * 60
-    printed = False
-    if script_path and os.path.isfile(script_path):
-        try:
-            with open(script_path, "r", encoding="utf-8", errors="replace") as f:
-                in_header = False
-                for line in f:
-                    s = line.strip()
-                    if s.startswith("# =="):
-                        if not in_header:
-                            in_header = True
-                            print(divider)
-                            printed = True
-                            continue
-                        else:
-                            break
-                    if in_header and s.startswith("#"):
-                        clean = s.lstrip("#").strip()
-                        if clean:
-                            print(clean)
-        except Exception:
-            pass
-    if printed:
-        print(divider)
-
-def read_patch(filename):
-    try:
-        with open(filename, "r", encoding="utf-8", errors="replace") as f:
-            return f.read().replace("\r\n", "\n")
-    except FileNotFoundError:
-        print(f"Error: File '{filename}' not found!", file=sys.stderr)
-        sys.exit(1)
-
-def split_patch(content):
-    parts = re.split(r"(?=^diff --git )", content, flags=re.MULTILINE)
-    return parts[1:]
-
-def get_target_file(patch):
-    for line in patch.split("\n"):
-        if line.startswith("+++ b/"):
-            return line[6:].split("\t")[0].strip()
-    return None
-
-def get_body(patch):
-    lines = patch.split("\n")
-    for i, line in enumerate(lines):
-        if line.startswith("@@"):
-            return lines[:i], lines[i:]
-    return lines, []
-
-def remove_duplicate_plus_empty(lines):
-    result = []
-    prev_plus_empty = False
-    for line in lines:
-        is_plus_empty = (line.strip() == "+")
-        if is_plus_empty and prev_plus_empty:
-            continue
-        result.append(line)
-        prev_plus_empty = is_plus_empty
-    return result
-
-def strip_comment(l):
-    s = l.strip()
-    for marker in ["//", "/*"]:
-        idx = s.find(marker)
-        if idx != -1:
-            s = s[:idx].strip()
-    return s
-
-def get_directive(l):
-    s = strip_comment(l)
-    if not s.startswith("+"):
-        return ""
-    return s[1:].lstrip()
-
-def is_if(l):
-    d = get_directive(l)
-    return d.startswith("#if")
-
-def is_else(l):
-    d = get_directive(l)
-    return d.startswith("#else") or d.startswith("#elif")
-
-def is_endif(l):
-    d = get_directive(l)
-    return d.startswith("#endif")
-
-def is_ksu_susfs_if(line):
-    # Matches: #ifdef CONFIG_KSU_SUSFS, #if defined(CONFIG_KSU_SUSFS), #if IS_ENABLED(CONFIG_KSU_SUSFS)
-    # Does NOT match: CONFIG_KSU_SUSFS_SUS_MOUNT, #ifndef
-    return bool(re.match(
-        r"^\+\s*#\s*if(?:def\s+CONFIG_KSU_SUSFS\b|\s+(?:defined\s*\(\s*|IS_ENABLED\s*\(\s*)?CONFIG_KSU_SUSFS\s*\)?)\s*$",
-        line
-    ))
-
-def is_ksu_susfs_ifndef(line):
-    # Matches: #ifndef CONFIG_KSU_SUSFS, #if !defined(CONFIG_KSU_SUSFS), #if !IS_ENABLED(CONFIG_KSU_SUSFS)
-    return bool(re.match(
-        r"^\+\s*#\s*(?:ifndef\s+CONFIG_KSU_SUSFS\b|if\s+!(?:defined\s*\(\s*|IS_ENABLED\s*\(\s*)?CONFIG_KSU_SUSFS\s*\)?)\s*$",
-        line
-    ))
-
-
-def process_normal_file(body, target):
-    result = []
-    i = 0
-    while i < len(body):
-        line = body[i]
-        clean_line = strip_comment(line)
-
-        if is_ksu_susfs_if(clean_line):
-            block_end = i + 1
-            depth = 1
-            else_idx = -1
-            endif_idx = -1
-            has_include = False
-
-            while block_end < len(body) and depth > 0:
-                cur_line = body[block_end]
-                if is_if(cur_line):
-                    depth += 1
-                elif is_else(cur_line) and depth == 1:
-                    else_idx = block_end
-                elif is_endif(cur_line):
-                    depth -= 1
-                    if depth == 0:
-                        endif_idx = block_end
-                        break
-                if "#include" in cur_line:
-                    has_include = True
-                block_end += 1
-
-            if endif_idx == -1:
-                endif_idx = block_end - 1
-
-            block_lines = body[i : endif_idx + 1]
-            block_text = "\n".join(block_lines)
-
-            # 1. Header include -> keep only if the file uses subsequent CONFIG_KSU_SUSFS_ features
-            if has_include and else_idx == -1:
-                remaining = "\n".join(body[endif_idx + 1:])
-                if "CONFIG_KSU_SUSFS_" in remaining:
-                    result.extend(body[i : endif_idx + 1])
-                i = endif_idx + 1
-                continue
-
-            has_ksu = bool(re.search(r"\b(?:ksu_|__ksu_)", block_text))
-            has_susfs = bool(re.search(r"\b(?:susfs_|SUSFS_)", block_text))
-
-            # 2. Genuine SUSFS code (contains susfs_ / SUSFS_ and does NOT touch ksu_) -> KEEP
-            if has_susfs and not has_ksu:
-                result.extend(body[i : endif_idx + 1])
-                i = endif_idx + 1
-                continue
-
-            # 3. KSU inline hooks or assisting local variables -> DROP or RESTORE #else
-            if else_idx > 0 and endif_idx > 0:
-                result.extend(body[else_idx + 1 : endif_idx])
-            i = endif_idx + 1
-            continue
-
-        if is_ksu_susfs_ifndef(clean_line):
-            block_end = i + 1
-            depth = 1
-            else_idx = -1
-            endif_idx = -1
-
-            while block_end < len(body) and depth > 0:
-                cur_line = body[block_end]
-                if is_if(cur_line):
-                    depth += 1
-                elif is_else(cur_line) and depth == 1:
-                    else_idx = block_end
-                elif is_endif(cur_line):
-                    depth -= 1
-                    if depth == 0:
-                        endif_idx = block_end
-                        break
-                block_end += 1
-
-            if endif_idx == -1:
-                endif_idx = block_end - 1
-
-            # #ifndef CONFIG_KSU_SUSFS:
-            # - If there is an #else, the #ifndef branch is original code, #else is hook code
-            # -> KEEP #ifndef branch (i+1 to else_idx), DROP #else branch
-            if else_idx > 0 and endif_idx > 0:
-                result.extend(body[i + 1 : else_idx])
-            elif endif_idx > 0:
-                result.extend(body[i + 1 : endif_idx])
-            i = endif_idx + 1
-            continue
-
-        result.append(line)
-        i += 1
-
-    return result
-
-def parse_hunk_header(line):
-    match = re.match(r"@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)", line)
-    if not match:
-        return None
-    return (
-        int(match.group(1)),
-        int(match.group(2)) if match.group(2) else 1,
-        int(match.group(3)),
-        int(match.group(4)) if match.group(4) else 1,
-        match.group(5)
-    )
-
-def format_hunk_header(old_start, old_total, new_start, new_total, suffix):
-    old_str = f"-{old_start}" if old_total == 1 else f"-{old_start},{old_total}"
-    new_str = f"+{new_start}" if new_total == 1 else f"+{new_start},{new_total}"
-    return f"@@ {old_str} {new_str} @@{suffix}"
-
-def clean_body(body):
-    cleaned = []
-    i = 0
-    cumulative_delta = 0
-    while i < len(body):
-        line = body[i]
-
-        if line.startswith("@@"):
-            hunk_lines = []
-            j = i + 1
-            while j < len(body):
-                if body[j].startswith("@@") or body[j].startswith("diff --git"):
-                    break
-                hunk_lines.append(body[j])
-                j += 1
-
-            while hunk_lines and hunk_lines[-1] == "":
-                hunk_lines.pop()
-
-            ins_all = sum(1 for l in hunk_lines if l.startswith("+") and not l.startswith("+++"))
-            dels_all = sum(1 for l in hunk_lines if l.startswith("-") and not l.startswith("---"))
-
-            ins_meaningful = sum(1 for l in hunk_lines 
-                                if l.startswith("+") and not l.startswith("+++") and l.strip() != "+")
-            dels_meaningful = sum(1 for l in hunk_lines 
-                                 if l.startswith("-") and not l.startswith("---") and l.strip() != "-")
-
-            if ins_meaningful == 0 and dels_meaningful == 0:
-                i = j
-                continue
-
-            header_info = parse_hunk_header(line)
-            if header_info:
-                old_start, _, _, _, suffix = header_info
-                context = sum(1 for l in hunk_lines if l.startswith(" ") or l == "")
-                old_total = dels_all + context
-                new_total = ins_all + context
-                new_start = old_start + cumulative_delta
-                cumulative_delta += (new_total - old_total)
-                cleaned.append(format_hunk_header(old_start, old_total, new_start, new_total, suffix))
-                cleaned.extend(hunk_lines)
-                i = j
-                continue
-
-        cleaned.append(line)
-        i += 1
-
-    return cleaned
-
-def has_real_changes(body):
-    for line in body:
-        stripped = line.strip()
-        if line.startswith("+") and not line.startswith("+++") and stripped != "+":
-            return True
-        if line.startswith("-") and not line.startswith("---") and stripped != "-":
-            return True
-    return False
-
-HOOK_PATTERN = re.compile(r"\b(ksu_handle_\w+|ksu_hook_\w+)\b")
-
-def find_unique_hooks(lines):
-    hooks = []
-    for line in lines:
-        if line.startswith("+") and not line.startswith("+++"):
-            for m in HOOK_PATTERN.findall(line):
-                if m not in hooks:
-                    hooks.append(m)
-    return sorted(hooks)
-
-def process_patch(patch):
-    target = get_target_file(patch)
-    if not target:
-        return None, None
-
-    orig_lines = patch.split("\n")
-    orig_hunks = sum(1 for l in orig_lines if l.startswith("@@"))
-    orig_hooks = find_unique_hooks(orig_lines)
-
-    if target.startswith("security/"):
-        info = {
-            "target": target,
-            "status": "DROP",
-            "reason": "selinux",
-            "orig_hunks": orig_hunks,
-            "kept_hunks": 0,
-            "orig_hooks": orig_hooks,
-            "dropped_hooks": orig_hooks,
-            "remaining_hooks": [],
-        }
-        return None, info
-
-    header, body = get_body(patch)
-    if not body:
-        info = {
-            "target": target,
-            "status": "DROP",
-            "reason": "empty",
-            "orig_hunks": orig_hunks,
-            "kept_hunks": 0,
-            "orig_hooks": orig_hooks,
-            "dropped_hooks": orig_hooks,
-            "remaining_hooks": [],
-        }
-        return None, info
-
-    new_body = process_normal_file(body, target)
-    new_body = clean_body(new_body)
-
-    if not has_real_changes(new_body):
-        info = {
-            "target": target,
-            "status": "DROP",
-            "reason": "stripped" if orig_hooks else "no_changes",
-            "orig_hunks": orig_hunks,
-            "kept_hunks": 0,
-            "orig_hooks": orig_hooks,
-            "dropped_hooks": orig_hooks,
-            "remaining_hooks": [],
-        }
-        return None, info
-
-    remaining_hooks = find_unique_hooks(new_body)
-    dropped_hooks = [h for h in orig_hooks if h not in remaining_hooks]
-    kept_hunks = sum(1 for l in new_body if l.startswith("@@"))
-
-    info = {
-        "target": target,
-        "status": "KEEP",
-        "reason": None,
-        "orig_hunks": orig_hunks,
-        "kept_hunks": kept_hunks,
-        "orig_hooks": orig_hooks,
-        "dropped_hooks": dropped_hooks,
-        "remaining_hooks": remaining_hooks,
-    }
-
-    return "\n".join(header + new_body), info
-
-def main():
-    if len(sys.argv) < 2:
-        print("Usage: susfs_deinlined.sh <input_patch> [output_patch]", file=sys.stderr)
-        sys.exit(1)
-
-    input_file = sys.argv[1]
-    output_file = sys.argv[2] if len(sys.argv) > 2 else "deinlined.patch"
-    script_file = sys.argv[3] if len(sys.argv) > 3 else None
-
-    print_script_header_banner(script_file)
-
-    content = read_patch(input_file)
-    file_patches = split_patch(content)
-
-    if not file_patches:
-        print("Error: No diff --git sections found in patch!", file=sys.stderr)
-        sys.exit(1)
-
-    print(f"Processing {len(file_patches)} files...")
-
-    results = []
-    for patch in file_patches:
-        res, info = process_patch(patch)
-        if info:
-            results.append((res, info))
-
-    if not results:
-        print("Error: No valid patches found!", file=sys.stderr)
-        sys.exit(1)
-
-    processed = []
-    removed = []
-
-    for res, info in results:
-        status = info["status"]
-        tgt = info["target"]
-
-        orig_h = info["orig_hunks"]
-        kept_h = info["kept_hunks"]
-        drop_h = orig_h - kept_h
-        h_word = "hunk" if orig_h == 1 else "hunks"
-
-        if status == "KEEP":
-            processed.append(res.rstrip("\n"))
-        else:
-            removed.append(tgt)
-
-        print(f"  [{status}] {tgt} ({drop_h}/{orig_h} {h_word} dropped)")
-
-    if not processed:
-        print("Error: No file patches remain after processing!", file=sys.stderr)
-        sys.exit(1)
-
-    out_dir = os.path.dirname(os.path.abspath(output_file))
-    if out_dir:
-        os.makedirs(out_dir, exist_ok=True)
-
-    with open(output_file, "w", encoding="utf-8") as f:
-        f.write("\n".join(processed))
-        f.write("\n")
-
-    print("\nSummary:")
-    total_orig_hunks = sum(info["orig_hunks"] for _, info in results)
-    total_kept_hunks = sum(info["kept_hunks"] for _, info in results)
-    total_dropped_hunks = total_orig_hunks - total_kept_hunks
-
-    print(f"  Total files: {len(results)} ({len(processed)} kept, {len(removed)} dropped)")
-    print(f"  Total hunks: {total_orig_hunks} ({total_kept_hunks} kept, {total_dropped_hunks} dropped)")
-
-    all_dropped_hook_files = [info for _, info in results if info["dropped_hooks"]]
-    total_hooks_dropped = sum(len(info["dropped_hooks"]) for info in all_dropped_hook_files)
-    dropped_files = [info for _, info in results if info["status"] == "DROP"]
-
-    if dropped_files:
-        print(f"  Dropped files ({len(dropped_files)}):")
-        for info in dropped_files:
-            print(f"    - {info['target']}")
-    else:
-        print("  Dropped files: 0")
-
-    if total_hooks_dropped > 0:
-        print(f"  Stripped inline hooks ({total_hooks_dropped}):")
-        for info in all_dropped_hook_files:
-            h_names = ", ".join(re.sub(r"^(?:ksu_handle_|ksu_hook_)", "", h) for h in info["dropped_hooks"])
-            cnt = len(info["dropped_hooks"])
-            print(f"    - {info['target']} ({cnt}): {h_names}")
-    else:
-        print("  Stripped inline hooks: 0")
-
-    print(f"\nDone! Successfully written to: {output_file}")
-
-if __name__ == "__main__":
-    main()
-EOF
+--- a/fs/exec.c
++++ b/fs/exec.c
+@@ -1,5 +1,9 @@
+ #include <linux/vmalloc.h>
++#ifdef CONFIG_KSU_SUSFS
++#include <linux/susfs_def.h>
++#endif
+ 
+@@ -1,5 +1,15 @@
++#ifdef CONFIG_KSU_SUSFS
++extern struct static_key_true ksu_su_compat_enabled;
++extern struct static_key_true susfs_is_sdcard_android_data_not_decrypted;
++extern bool __ksu_is_allow_uid_for_current(uid_t uid);
++extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv,
++			void *envp, int *flags);
++extern int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr, void *argv,
++				void *envp, int *flags);
++extern int ksu_handle_post_execveat_sucompat(int *fd, struct filename **filename_ptr, void *argv,
++			void *envp, int *flags, int *retval);
++#endif
+ static int do_execveat_common(int fd, struct filename *filename,
+ 
+@@ -1,5 +1,8 @@
++#ifdef CONFIG_KSU_SUSFS
++	bool is_su_session = false;
++#endif // #ifdef CONFIG_KSU_SUSFS
+ 	if (IS_ERR(filename))
+ 
+@@ -1,5 +1,16 @@
++#ifdef CONFIG_KSU_SUSFS
++	if (likely(susfs_is_current_proc_no_su()))
++		goto orig_flow;
++	if (static_branch_likely(&ksu_su_compat_enabled)) {
++		if (static_branch_unlikely(&susfs_is_sdcard_android_data_not_decrypted))
++		is_su_session = !ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
++	else
++		is_su_session = !ksu_handle_execveat_sucompat(&fd, &filename, &argv, &envp, &flags);
++	}
++orig_flow:
++#endif
+ 	return PTR_ERR(filename);
+ 
+@@ -1,5 +1,9 @@
++#ifdef CONFIG_KSU_SUSFS
++	if (unlikely(is_su_session))
++		(void)ksu_handle_post_execveat_sucompat(&fd, &filename, &argv, &envp, &flags, &retval);
++#endif // #ifdef CONFIG_KSU_SUSFS
+ out_free:
+--- a/fs/open.c
++++ b/fs/open.c
+@@ -1,5 +1,8 @@
+ #include <linux/compat.h>
++#ifdef CONFIG_KSU_SUSFS
++#include <linux/susfs_def.h>
++#endif
+ 
+@@ -1,5 +1,12 @@
++#ifdef CONFIG_KSU_SUSFS
++extern struct static_key_true ksu_su_compat_enabled;
++extern bool __ksu_is_allow_uid_for_current(uid_t uid);
++extern int ksu_handle_faccessat(int *dfd, struct filename **filename, int *mode,
++             int *flags);
++extern int filename_lookup(int dfd, struct filename *name, unsigned flags,
++				struct path *path, struct path *root);
++#endif
+ SYSCALL_DEFINE3(faccessat
+ 
+@@ -1,5 +1,8 @@
++#ifdef CONFIG_KSU_SUSFS
++	struct filename *fname = NULL;
++#endif
+ 	if (mode & ~S_IRWXO)
+ 
+@@ -1,5 +1,16 @@
++#ifdef CONFIG_KSU_SUSFS
++	fname = getname_flags(filename, lookup_flags, NULL);
++
++	if (likely(susfs_is_current_proc_no_su()))
++		goto orig_flow;
++
++	if (static_branch_likely(&ksu_su_compat_enabled)) {
++		if (unlikely(__ksu_is_allow_uid_for_current(current_uid().val)))
++			ksu_handle_faccessat(&dfd, &fname, &mode, NULL);
++	}
++
++orig_flow:
++	res = filename_lookup(dfd, fname, lookup_flags, &path, NULL);
++	// no putname(fname) here as filename_lookup() has it done for us already;
++#else
+ 	res = user_path_at(dfd, filename, lookup_flags, &path);
++#endif
+--- a/fs/read_write.c
++++ b/fs/read_write.c
+@@ -1,5 +1,9 @@
++#ifdef CONFIG_KSU
++extern struct static_key_true ksu_is_init_rc_hook_enabled;
++extern __attribute__((cold)) int ksu_handle_sys_read(unsigned int fd);
++#endif
+ SYSCALL_DEFINE3(read,
+ 
+@@ -1,5 +1,9 @@
++#ifdef CONFIG_KSU
++	if (static_branch_unlikely(&ksu_is_init_rc_hook_enabled))
++		ksu_handle_sys_read(fd);
++#endif
+ 	return ksys_read(fd, buf, count);
+--- a/fs/stat.c
++++ b/fs/stat.c
+@@ -1,5 +1,14 @@
+ #include <asm/unistd.h>
++#include "internal.h"
++#ifdef CONFIG_KSU_SUSFS
++#include <linux/susfs_def.h>
++#include "mount.h"
++#endif
++#ifdef CONFIG_KSU_SUSFS
++extern struct static_key_true ksu_is_init_rc_hook_enabled;
++extern void ksu_handle_vfs_fstat(int fd, loff_t *kstat_size_ptr);
++extern struct static_key_true ksu_su_compat_enabled;
++extern bool __ksu_is_allow_uid_for_current(uid_t uid);
++extern int ksu_handle_stat(int *dfd, struct filename **filename, int *flags);
++#endif // #ifdef CONFIG_KSU_SUSFS
+ 
+@@ -1,5 +1,10 @@
++#ifdef CONFIG_KSU_SUSFS
++	struct filename *fname = NULL;
++extern int filename_lookup(int dfd, struct filename *name, unsigned flags,
++				struct path *path, struct path *root);
++#endif
+ 	if ((flags & ~(AT_SYMLINK_NOFOLLOW | AT_NO_AUTOMOUNT |
+ 
+@@ -1,5 +1,16 @@
++#ifdef CONFIG_KSU_SUSFS
++	fname = getname_flags(filename, lookup_flags, NULL);
++
++	if (likely(susfs_is_current_proc_no_su()))
++		goto orig_flow;
++
++	if (static_branch_likely(&ksu_su_compat_enabled)) {
++		if (unlikely(__ksu_is_allow_uid_for_current(current_uid().val)))
++			ksu_handle_stat(&dfd, &fname, &flags);
++	}
++
++orig_flow:
++	error = filename_lookup(dfd, fname, lookup_flags, &path, NULL);
++	// no putname(fname) here as filename_lookup() has it done for us already;
++#else
+ 	error = user_path_at(dfd, filename, lookup_flags, &path);
++#endif
+ 
+@@ -1,5 +1,9 @@
++#ifdef CONFIG_KSU_SUSFS
++		if (static_branch_unlikely(&ksu_is_init_rc_hook_enabled))
++			ksu_handle_vfs_fstat(fd, &stat->size);
++#endif // #ifdef CONFIG_KSU_SUSFS
+ 	fdput(f);
+--- a/fs/namei.c
++++ b/fs/namei.c
+@@ -1,5 +1,5 @@
+-static int filename_lookup(int dfd, struct filename *name, unsigned flags,
++int filename_lookup(int dfd, struct filename *name, unsigned flags,
+ 
+@@ -1,5 +1,11 @@
+ 	if (unlikely(err)) {
++#ifdef CONFIG_KSU
++		if (unlikely(strstr(current->comm, "throne_tracker"))) {
++			err = -ENOENT;
++			goto out_err;
++		}
++#endif
+--- a/drivers/input/input.c
++++ b/drivers/input/input.c
+@@ -1,5 +1,9 @@
++#ifdef CONFIG_KSU
++extern struct static_key_true ksu_is_input_hook_enabled;
++extern int ksu_handle_input_handle_event(unsigned int *type, unsigned int *code, int *value);
++#endif
+ static void input_handle_event(struct input_dev *dev,
+ 
+@@ -1,5 +1,9 @@
+ 	input_get_disposition(dev, type, code, &value);
++#ifdef CONFIG_KSU_SUSFS
++	if (static_branch_unlikely(&ksu_is_input_hook_enabled))
++		ksu_handle_input_handle_event(&type, &code, &value);
++#endif
+--- a/security/security.c
++++ b/security/security.c
+@@ -1,5 +1,10 @@
++#ifdef CONFIG_KSU
++extern int ksu_bprm_check(struct linux_binprm *bprm);
++extern int ksu_handle_rename(struct dentry *old_dentry, struct dentry *new_dentry);
++extern int ksu_handle_setuid(struct cred *new, const struct cred *old);
++#endif
+ int security_binder_set_context_mgr(struct task_struct
+ 
+@@ -1,5 +1,8 @@
++#ifdef CONFIG_KSU
++	ksu_bprm_check(bprm);
++#endif
+ 	ret = security_ops->bprm_check_security(bprm);
+ 
+@@ -1,5 +1,8 @@
++#ifdef CONFIG_KSU
++	ksu_handle_rename(old_dentry, new_dentry);
++#endif
+ 	if (unlikely(IS_PRIVATE(old_dentry->d_inode) ||
+ 
+@@ -1,5 +1,8 @@
++#ifdef CONFIG_KSU
++	ksu_handle_setuid(new, old);
++#endif
+ 	return security_ops->task_fix_setuid(new, old, flags);
+--- a/security/selinux/hooks.c
++++ b/security/selinux/hooks.c
+@@ -1,5 +1,9 @@
++#ifdef CONFIG_KSU
++    static u32 ksu_sid;
++    char *secdata;
++#endif
+ 	int nnp = (bprm->unsafe & LSM_UNSAFE_NO_NEW_PRIVS);
+ 
+@@ -1,5 +1,9 @@
++#ifdef CONFIG_KSU
++    int error;
++    u32 seclen;
++#endif
+ 	if (!nnp && !nosuid)
+ 
+@@ -1,5 +1,17 @@
+ 	return 0; /* No change in credentials */
++
++#ifdef CONFIG_KSU
++    if (!ksu_sid)
++        security_secctx_to_secid("u:r:su:s0", strlen("u:r:su:s0"), &ksu_sid);
++
++    error = security_secid_to_secctx(old_tsec->sid, &secdata, &seclen);
++    if (!error) {
++        rc = strcmp("u:r:init:s0", secdata);
++        security_release_secctx(secdata, seclen);
++        if (rc == 0 && new_tsec->sid == ksu_sid)
++            return 0;
++    }
++#endif
+ 
+@@ -1,5 +1,8 @@
++#ifdef CONFIG_KSU
++extern int ksu_hide_setprocattr(const char *name, void *value, size_t size);
++#endif
+ static int selinux_setprocattr(struct task_struct *p,
+ 
+@@ -1,5 +1,8 @@
+ 	char *str = value;
++#ifdef CONFIG_KSU
++	ksu_hide_setprocattr(name, value, size);
++#endif
+--- a/security/selinux/ss/services.c
++++ b/security/selinux/ss/services.c
+@@ -1,2 +1,2 @@
+-static DEFINE_RWLOCK(policy_rwlock);
++DEFINE_RWLOCK(policy_rwlock);
+--- a/kernel/reboot.c
++++ b/kernel/reboot.c
+@@ -1,5 +1,8 @@
++#ifdef CONFIG_KSU_SUSFS
++extern int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd, void __user **arg);
++#endif
+ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
+ 
+@@ -1,5 +1,10 @@
+ 	int ret = 0;
++#ifdef CONFIG_KSU_SUSFS
++    if (system_state == SYSTEM_RUNNING) {
++        ksu_handle_sys_reboot(magic1, magic2, cmd, &arg);
++    }
++#endif
+--- a/kernel/sys.c
++++ b/kernel/sys.c
+@@ -1,5 +1,8 @@
++#ifdef CONFIG_KSU
++extern int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid);
++#endif
+ SYSCALL_DEFINE3(setresuid, uid_t, ruid, uid_t, euid, uid_t, suid)
+ 
+@@ -1,5 +1,10 @@
++#ifdef CONFIG_KSU_SUSFS
++	if (ksu_handle_setresuid(ruid, euid, suid)) {
++		pr_info("Something wrong with ksu_handle_setresuid()\\n");
++	}
++#endif
+ 	return __sys_setresuid(ruid, euid, suid);
