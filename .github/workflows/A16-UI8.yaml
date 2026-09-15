@@ -262,6 +262,27 @@ jobs:
             sed -i 's/tunables->down_rate_limit_us = cpufreq_policy_transition_delay_us(policy);/tunables->down_rate_limit_us = 20000;/g' "$SCHEDUTIL_FILE"
             
             echo "[+] Schedutil optimization applied successfully."
+
+      - name: 🧠 Optimize VM, zRAM & Mali-G76 Smoothness
+        shell: bash
+        run: |
+            cd $GITHUB_WORKSPACE/device_kernel
+            
+            echo "[+] Optimizing Virtual Memory (VM) and Swap..."
+            
+            # 1.
+            find mm -name "vmscan.c" -exec sed -i 's/int vm_vfs_cache_pressure = 100;/int vm_vfs_cache_pressure = 50;/g' {} +
+            
+            # 2. page-cluster:
+            find mm -name "swap.c" -exec sed -i 's/int page_cluster;/int page_cluster = 0;/g' {} +
+            
+            echo "[+] Optimizing Mali GPU Idle Timers..."
+            
+            # 3. GPU Autosuspend Delay
+            find drivers/gpu/arm/ -type f -name "mali_kbase_core_linux.c" -exec sed -i 's/KBASE_DEFAULT_RUNTIME_PM_AUTOSUSPEND_DELAY 50/KBASE_DEFAULT_RUNTIME_PM_AUTOSUSPEND_DELAY 250/g' {} +
+            find drivers/gpu/arm/ -type f -name "mali_kbase_core_linux.c" -exec sed -i 's/autosuspend_delay_ms = 50;/autosuspend_delay_ms = 250;/g' {} +
+            
+            echo "[+] VM and GPU tweaks applied successfully."
           
       - name: 🔒 Patch Kernel of Baseband Guard
         uses: ./.github/workflows/patch-baseband-guard
