@@ -266,7 +266,7 @@ jobs:
             
             echo "[+] Creating dummy stubs for undefined Samsung debug symbols..."
             
-            # LLD Linker'in bulamadığı tüm Samsung debug fonksiyonlarının içini boşaltıp sahte (dummy) bir C dosyası yaratıyoruz.
+            # d3
             cat > arch/arm64/kernel/samsung_dummy_stubs.c << 'EOF'
             long dbg_snapshot_print_notifier_call() { return 0; }
             long dbg_snapshot_save_log() { return 0; }
@@ -280,8 +280,8 @@ jobs:
             long exynos_dump_common_cpu_reg() { return 0; }
             EOF
             
-            # Bu yeni sahte dosyayı Kernel derleme sistemine (Makefile) ekliyoruz.
-            # '-w' parametresi ile derleyicinin bu boş fonksiyonlar için 'warning' (uyarı) vermesini de engelliyoruz.
+            # d
+            # d2
             echo "CFLAGS_samsung_dummy_stubs.o := -w" >> arch/arm64/kernel/Makefile
             echo "obj-y += samsung_dummy_stubs.o" >> arch/arm64/kernel/Makefile
             
