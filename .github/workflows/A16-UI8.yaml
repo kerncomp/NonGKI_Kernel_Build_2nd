@@ -142,50 +142,6 @@ jobs:
           patch -p1 < no_oc_undervolt.patch
           
           echo "[+] Patch applied successfully!"
-          
-      - name: ⚖️ Apply & Fix SBalance Patch (4.14 Backport)
-        shell: bash
-        run: |
-          cd $GITHUB_WORKSPACE/device_kernel
-          
-          echo "[*] Searching for SBalance patch in backup directory (/tmp/Patches_Backup)..."
-          PATCH_FILE=$(find /tmp/Patches_Backup -name "sbalance.patch" 2>/dev/null | head -n 1)
-          
-          if [ -z "$PATCH_FILE" ]; then
-              echo "[-] CRITICAL ERROR: sbalance.patch not found in backup directory!"
-              exit 1
-          fi
-          
-          echo "[+] Patch found: $PATCH_FILE"
-          sed -i 's/\r$//' "$PATCH_FILE"
-          
-          # 1. Clean up old .rej files
-          find . -name "*.rej" -type f -delete
-          
-          # 2. Apply patch with fuzz factor (--fuzz=3)
-          echo "[*] Applying patch to kernel..."
-          patch -t -N -p1 --fuzz=3 < "$PATCH_FILE" || true
-          
-          # 3. STRICT CHECK (Stop process if any hunk is rejected)
-          if find . -name "*.rej" | grep -q .; then
-              echo "[-] CRITICAL ERROR: SBalance patch did not apply cleanly!"
-              echo "[-] Rejected hunks:"
-              find . -name "*.rej" -exec cat {} \;
-              exit 1
-          fi
-          
-          # Safe Makefile Fix
-          echo "[*] Adding sbalance.o to Makefile..."
-          if ! grep -q "sbalance.o" kernel/irq/Makefile; then
-              echo "obj-y += sbalance.o" >> kernel/irq/Makefile
-          fi
-          
-          echo "[*] Fixing SBalance C code for 4.14 architecture..."
-          sed -i '1s/^/#include <linux\/cpufreq.h>\n/' kernel/irq/sbalance.c
-          sed -i 's/arch_scale_cpu_capacity(cpu)/arch_scale_cpu_capacity(NULL, cpu)/g' kernel/irq/sbalance.c
-          echo -e "\n\t}\n}" >> kernel/irq/sbalance.c
-          
-          echo "[+] SBalance patch and backport fix completed successfully!"
 
       - name: ⚙️ Custom Scheduler Optimizations (Hardcoded & Locked)
         shell: bash
@@ -262,9 +218,6 @@ jobs:
           # 1. Configleri ekle
           cat >> "$DEFCONFIG_FILE" << 'EOF'
           
-          CONFIG_IRQ_SBALANCE=y
-          CONFIG_SBALANCE_EXCLUDE_CPUS=""
-          CONFIG_IRQ_SBALANCE_POLL_MSEC=1000
           CONFIG_SCHED_BORE=y
           CONFIG_KPM=y
           
