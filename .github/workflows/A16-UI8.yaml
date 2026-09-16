@@ -176,39 +176,6 @@ jobs:
       - name: 🪝 Patch Kernel of SUSFS
         uses: ./.github/workflows/patch-susfs
 
-      - name: 🛠️ Apply Custom Commits (sidex15)
-        shell: bash
-        run: |
-          cd $GITHUB_WORKSPACE/device_kernel
-          
-          echo "[*] 1. Downloading Kernel Commit..."
-          # GitHub commit linkinin sonuna .patch ekleyerek doğrudan diff dosyasını indiriyoruz
-          wget -qO kernel_custom.patch https://github.com/fatalcoder524/kernel_patches_additional/commit/598b8b81224ce477cfbc1dbf475a6e6549b83452.patch
-          
-          echo "[*] Applying Kernel Commit..."
-          patch -p1 --fuzz=3 < kernel_custom.patch || true
-          
-          echo "------------------------------------------------"
-          
-          echo "[*] 2. Downloading and modifying KernelSU-Next Commit..."
-          wget -qO ksu_custom.patch https://github.com/sidex15/KernelSU-Next/commit/27fb3cfb5ffb4f6abd248819f05a4d757af3880c.patch
-          
-          # Patch dosyasının içindeki "default n" yazısını "default y" olarak KSU Kconfig'i için değiştiriyoruz
-          sed -i 's/default n/default y/g' ksu_custom.patch
-          
-          # KernelSU (veya ReSukiSU) klasörünü otomatik bulup yamayı tam olarak o klasörün içine uyguluyoruz
-          KSU_DIR=$(find . -maxdepth 3 -type d \( -name "KernelSU" -o -name "kernelsu" -o -name "KernelSU-Next" -o -name "resukisu" \) | head -n 1)
-          if [ -n "$KSU_DIR" ]; then
-            echo "[+] Found KSU directory at $KSU_DIR. Applying KSU patch..."
-            cd "$KSU_DIR"
-            patch -p1 --fuzz=3 < $GITHUB_WORKSPACE/device_kernel/ksu_custom.patch || true
-            cd $GITHUB_WORKSPACE/device_kernel
-          else
-            echo "[-] KernelSU directory not found! Skipping KSU patch."
-          fi
-          
-          echo "[+] Custom commits applied successfully!"
-        
       - name: 🔗 Patch for no-kprobe
         uses: ./.github/workflows/patch-no-kprobe
     
