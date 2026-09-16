@@ -189,7 +189,7 @@ jobs:
           sed -i 's/default n/default y/g' kernel_custom.patch
           
           echo "[*] Applying Kernel Commit..."
-          patch -p1 --fuzz=3 < kernel_custom.patch || true
+          patch -p1 --fuzz=3 < kernel_custom.patch
           
           echo "------------------------------------------------"
           
@@ -201,7 +201,7 @@ jobs:
           if [ -n "$KSU_DIR" ]; then
             echo "[+] Found KSU directory at $KSU_DIR. Applying KSU patch..."
             cd "$KSU_DIR"
-            patch -p1 --fuzz=3 < $GITHUB_WORKSPACE/device_kernel/ksu_custom.patch || true
+            patch -p1 --fuzz=3 < $GITHUB_WORKSPACE/device_kernel/ksu_custom.patch
             cd $GITHUB_WORKSPACE/device_kernel
           else
             echo "[-] KernelSU directory not found! Skipping KSU patch."
