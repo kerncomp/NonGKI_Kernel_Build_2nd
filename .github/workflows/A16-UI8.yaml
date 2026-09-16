@@ -424,7 +424,7 @@ jobs:
           CMDLINE='loop.max_part=7'
           HASHTYPE=sha1
           HEADER_VERSION=1
-          OS_PATCH_LEVEL=2025-08
+          OS_PATCH_LEVEL=2026-08
           OS_VERSION=16.0.0
           PAGESIZE=2048
           RAMDISK=build/out/d2s/ramdisk.cpio.gz
