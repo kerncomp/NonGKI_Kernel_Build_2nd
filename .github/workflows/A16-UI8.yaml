@@ -275,6 +275,11 @@ jobs:
             echo "[*] Hardcoding SUS_MEMFD into defconfig..."
             sed -i '/CONFIG_KSU_SUSFS_SUS_MEMFD/d' "$DEFCONFIG_FILE"
             echo "CONFIG_KSU_SUSFS_SUS_MEMFD=y" >> "$DEFCONFIG_FILE"
+            echo "[+] Optimizing RAM (Virtual Memory & zRAM)..."
+            sed -i 's/CONFIG_SLUB_DEBUG=y/# CONFIG_SLUB_DEBUG is not set/g' "$DEFCONFIG_FILE"
+            sed -i 's/CONFIG_PAGE_POISONING=y/# CONFIG_PAGE_POISONING is not set/g' "$DEFCONFIG_FILE"
+            find mm -name "vmscan.c" -exec sed -i 's/int vm_vfs_cache_pressure = 100;/int vm_vfs_cache_pressure = 50;/g' {} +
+            find mm -name "swap.c" -exec sed -i 's/int page_cluster;/int page_cluster = 0;/g' {} +
             
       - name: ⚡ Optimize Schedutil for Exynos Performance
         shell: bash
