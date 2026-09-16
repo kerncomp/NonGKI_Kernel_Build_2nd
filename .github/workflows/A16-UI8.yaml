@@ -190,7 +190,6 @@ jobs:
             "f2fs_enlarge_min_fsync_blocks.patch"
             "disable_cache_hot_buddy.patch"
             "adjust_cpu_scan_order.patch"
-            "add_limitation_scaling_min_freq.patch"
           )
           
           echo "[+] Downloading and applying extreme optimization patches..."
