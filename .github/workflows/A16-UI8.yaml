@@ -273,6 +273,7 @@ jobs:
             echo "# CONFIG_KSU_SUSFS_SPOOF_UNAME is not set" >> "$DEFCONFIG_FILE"
             echo "[+] Patching debug-snapshot.h to fix bcmdhd unused function error..."
             echo "[*] Hardcoding SUS_MEMFD into defconfig..."
+            sed -i '/CONFIG_KSU_SUSFS_SUS_MEMFD/d' "$DEFCONFIG_FILE"
             echo "CONFIG_KSU_SUSFS_SUS_MEMFD=y" >> "$DEFCONFIG_FILE"
             
       - name: ⚡ Optimize Schedutil for Exynos Performance
