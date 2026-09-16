@@ -183,7 +183,7 @@ jobs:
           
           echo "[*] 1. Downloading Kernel Commit..."
           # GitHub commit linkinin sonuna .patch ekleyerek doğrudan diff dosyasını indiriyoruz
-          wget -qO kernel_custom.patch https://github.com/sidex15/android_kernel_lge_sm8150/commit/bc23096b9df4d76c43bfea9e217978ecc93b94d4.patch
+          wget -qO kernel_custom.patch https://github.com/fatalcoder524/kernel_patches_additional/commit/598b8b81224ce477cfbc1dbf475a6e6549b83452.patch
           
           echo "[*] Applying Kernel Commit..."
           patch -p1 --fuzz=3 < kernel_custom.patch || true
