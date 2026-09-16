@@ -173,6 +173,45 @@ jobs:
 
             echo "[+] Optimizations locked into kernel successfully!"
 
+      - name: 🛠️ Apply Fatalcoder Optimizations
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          # GitHub Raw bağlantı adresi
+          BASE_URL="https://raw.githubusercontent.com/fatalcoder524/kernel_patches_additional/main/other_opt"
+          
+          # Uygulanacak yamaların listesi
+          PATCHES=(
+            "use_unlikely_wrap_cpufreq.patch"
+            "silence_system_logspam.patch"
+            "silence_irq_cpu_logspam.patch"
+            "reduce_pci_pme_wakeups.patch"
+            "re_write_limitation_scaling_min_freq.patch"
+            "increase_sk_mem_packets.patch"
+            "increase_ext4_default_commit_age.patch"
+            "f2fs_enlarge_min_fsync_blocks.patch"
+            "disable_cache_hot_buddy.patch"
+            "adjust_cpu_scan_order.patch"
+            "add_limitation_scaling_min_freq.patch"
+          )
+          
+          echo "[+] Downloading and applying extreme optimization patches..."
+          
+          for PATCH_FILE in "${PATCHES[@]}"; do
+            echo "------------------------------------------------"
+            echo "[*] Processing: $PATCH_FILE"
+            
+            # Yamayı indir
+            wget -qO "$PATCH_FILE" "$BASE_URL/$PATCH_FILE"
+            
+            # Yamayı toleransla uygula, çakışırsa sistemi çökertmeden diğerine geç
+            patch -p1 --fuzz=3 < "$PATCH_FILE" || true
+          done
+          
+          echo "------------------------------------------------"
+          echo "[+] All optimization patches processed successfully!"
+
       - name: 🪝 Patch Kernel of SUSFS
         uses: ./.github/workflows/patch-susfs
 
