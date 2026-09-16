@@ -175,6 +175,39 @@ jobs:
 
       - name: 🪝 Patch Kernel of SUSFS
         uses: ./.github/workflows/patch-susfs
+
+      - name: 🛠️ Apply Custom Commits (sidex15)
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          
+          echo "[*] 1. Downloading and modifying Kernel Commit..."
+          #  .patch
+          wget -qO kernel_custom.patch https://github.com/sidex15/android_kernel_lge_sm8150/commit/bc23096b9df4d76c43bfea9e217978ecc93b94d4.patch
+          
+          # "default n" to "default y"
+          sed -i 's/default n/default y/g' kernel_custom.patch
+          
+          echo "[*] Applying Kernel Commit..."
+          patch -p1 --fuzz=3 < kernel_custom.patch || true
+          
+          echo "------------------------------------------------"
+          
+          echo "[*] 2. Downloading KernelSU-Next Commit..."
+          wget -qO ksu_custom.patch https://github.com/sidex15/KernelSU-Next/commit/27fb3cfb5ffb4f6abd248819f05a4d757af3880c.patch
+          
+          # KernelSU 
+          KSU_DIR=$(find . -maxdepth 3 -type d \( -name "KernelSU" -o -name "kernelsu" -o -name "KernelSU-Next" -o -name "resukisu" \) | head -n 1)
+          if [ -n "$KSU_DIR" ]; then
+            echo "[+] Found KSU directory at $KSU_DIR. Applying KSU patch..."
+            cd "$KSU_DIR"
+            patch -p1 --fuzz=3 < $GITHUB_WORKSPACE/device_kernel/ksu_custom.patch || true
+            cd $GITHUB_WORKSPACE/device_kernel
+          else
+            echo "[-] KernelSU directory not found! Skipping KSU patch."
+          fi
+          
+          echo "[+] Custom commits applied successfully!"
         
       - name: 🔗 Patch for no-kprobe
         uses: ./.github/workflows/patch-no-kprobe
