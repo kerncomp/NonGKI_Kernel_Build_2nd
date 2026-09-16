@@ -247,6 +247,9 @@ jobs:
             sed -i 's/CONFIG_PAGE_POISONING=y/# CONFIG_PAGE_POISONING is not set/g' "$DEFCONFIG_FILE"
             find mm -name "vmscan.c" -exec sed -i 's/int vm_vfs_cache_pressure = 100;/int vm_vfs_cache_pressure = 50;/g' {} +
             find mm -name "swap.c" -exec sed -i 's/int page_cluster;/int page_cluster = 0;/g' {} +
+            echo "[*] Enabling SCSI Multi-Queue (blk-mq) for modern schedulers..."
+            sed -i '/CONFIG_SCSI_MQ_DEFAULT/d' "$DEFCONFIG_FILE"
+            echo "CONFIG_SCSI_MQ_DEFAULT=y" >> "$DEFCONFIG_FILE"
             
       - name: ⚡ Optimize Schedutil for Exynos Performance
         shell: bash
