@@ -285,6 +285,17 @@ jobs:
             echo "[*] Enabling SCSI Multi-Queue (blk-mq) for modern schedulers..."
             sed -i '/CONFIG_SCSI_MQ_DEFAULT/d' "$DEFCONFIG_FILE"
             echo "CONFIG_SCSI_MQ_DEFAULT=y" >> "$DEFCONFIG_FILE"
+            echo "[*] Enabling SCSI Multi-Queue (blk-mq)..."
+            sed -i '/CONFIG_SCSI_MQ_DEFAULT/d' "$DEFCONFIG_FILE"
+            echo "CONFIG_SCSI_MQ_DEFAULT=y" >> "$DEFCONFIG_FILE"
+
+            echo "[*] Removing buggy Kyber and setting MQ-Deadline as default..."
+            sed -i 's/CONFIG_DEFAULT_MQ_IOSCHED_KYBER=y/# CONFIG_DEFAULT_MQ_IOSCHED_KYBER is not set/g' "$DEFCONFIG_FILE"
+            sed -i 's/CONFIG_DEFAULT_IOSCHED="kyber"/CONFIG_DEFAULT_IOSCHED="deadline"/g' "$DEFCONFIG_FILE"
+            sed -i '/CONFIG_DEFAULT_DEADLINE/d' "$DEFCONFIG_FILE"
+            echo "CONFIG_DEFAULT_DEADLINE=y" >> "$DEFCONFIG_FILE"
+            sed -i '/CONFIG_MQ_IOSCHED_DEADLINE/d' "$DEFCONFIG_FILE"
+            echo "CONFIG_MQ_IOSCHED_DEADLINE=y" >> "$DEFCONFIG_FILE"
             
       - name: ⚡ Optimize Schedutil for Exynos Performance
         shell: bash
