@@ -184,7 +184,6 @@ jobs:
           # Uygulanacak yamaların listesi
           PATCHES=(
             "use_unlikely_wrap_cpufreq.patch"
-            "silence_system_logspam.patch"
             "silence_irq_cpu_logspam.patch"
             "reduce_pci_pme_wakeups.patch"
             "re_write_limitation_scaling_min_freq.patch"
