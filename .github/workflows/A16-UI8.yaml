@@ -188,6 +188,8 @@ jobs:
             "increase_sk_mem_packets.patch"
             "increase_ext4_default_commit_age.patch"
             "f2fs_enlarge_min_fsync_blocks.patch"
+            "disable_cache_hot_buddy.patch"
+            "adjust_cpu_scan_order.patch"
           )
           
           echo "[+] Downloading and applying extreme optimization patches..."
@@ -239,13 +241,13 @@ jobs:
       - name: 💿 Patch Kernel of Droidspaces
         uses: ./.github/workflows/patch-droidspaces
             
-      - name: ➕ Add Non-GKI configs to defconfig
+      - name: ➕ Add Non-GKI configs and Optimize
         shell: bash
         run: |
             cd $GITHUB_WORKSPACE/device_kernel
             DEFCONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
             
-            # 1. Add config
+            # 1. Add base configs
             cat >> "$DEFCONFIG_FILE" << 'EOF'
             
             CONFIG_SCHED_BORE=y
@@ -253,7 +255,7 @@ jobs:
             
             EOF
             
-            # 2.
+            # 2. Disable heavy debuggers and clean logs
             sed -i \
               -e 's/CONFIG_SLUB_DEBUG=y/# CONFIG_SLUB_DEBUG is not set/g' \
               -e 's/CONFIG_SEC_NAD=y/# CONFIG_SEC_NAD is not set/g' \
@@ -266,58 +268,25 @@ jobs:
               -e 's/CONFIG_MALI_EXYNOS_DEBUG=y/# CONFIG_MALI_EXYNOS_DEBUG is not set/g' \
               -e 's/CONFIG_ION_DEBUG_EVENT_RECORD=y/# CONFIG_ION_DEBUG_EVENT_RECORD is not set/g' \
               -e 's/CONFIG_MMC_DW_DEBUG=y/# CONFIG_MMC_DW_DEBUG is not set/g' \
+              -e 's/CONFIG_PAGE_POISONING=y/# CONFIG_PAGE_POISONING is not set/g' \
               "$DEFCONFIG_FILE"
               
-            # 3. Spoof Uname 
+            # 3. Spoof Uname
             sed -i '/CONFIG_KSU_SUSFS_SPOOF_UNAME/d' "$DEFCONFIG_FILE"
             echo "# CONFIG_KSU_SUSFS_SPOOF_UNAME is not set" >> "$DEFCONFIG_FILE"
             echo "[+] Patching debug-snapshot.h to fix bcmdhd unused function error..."
-            echo "[*] Hardcoding SUS_MEMFD into defconfig..."
-            sed -i '/CONFIG_KSU_SUSFS_SUS_MEMFD/d' "$DEFCONFIG_FILE"
-            echo "CONFIG_KSU_SUSFS_SUS_MEMFD=y" >> "$DEFCONFIG_FILE"
+            
+            
+            # 4. Optimizing RAM (Virtual Memory & zRAM)
             echo "[+] Optimizing RAM (Virtual Memory & zRAM)..."
-            sed -i 's/CONFIG_SLUB_DEBUG=y/# CONFIG_SLUB_DEBUG is not set/g' "$DEFCONFIG_FILE"
-            sed -i 's/CONFIG_PAGE_POISONING=y/# CONFIG_PAGE_POISONING is not set/g' "$DEFCONFIG_FILE"
             find mm -name "vmscan.c" -exec sed -i 's/int vm_vfs_cache_pressure = 100;/int vm_vfs_cache_pressure = 50;/g' {} +
             find mm -name "swap.c" -exec sed -i 's/int page_cluster;/int page_cluster = 0;/g' {} +
             
-      - name: ⚡ Optimize Schedutil for Exynos Performance
-        shell: bash
-        run: |
-            cd $GITHUB_WORKSPACE/device_kernel
-            SCHEDUTIL_FILE="kernel/sched/cpufreq_schedutil.c"
-            
-            echo "[+] Optimizing schedutil rate limits..."
-            
-            # 1. Set up_rate_limit_us to 500us for instant wake-up (zero delay on touch)
-            sed -i 's/tunables->up_rate_limit_us = cpufreq_policy_transition_delay_us(policy);/tunables->up_rate_limit_us = 500;/g' "$SCHEDUTIL_FILE"
-            
-            # 2. Set down_rate_limit_us to 20000us to prevent micro-stutters during scrolling
-            sed -i 's/tunables->down_rate_limit_us = cpufreq_policy_transition_delay_us(policy);/tunables->down_rate_limit_us = 20000;/g' "$SCHEDUTIL_FILE"
-            
-            echo "[+] Schedutil optimization applied successfully."
+            # 5. blk-mq and MQ-Deadline setup (Fixing Kyber panic)
+            echo "[*] Enabling SCSI Multi-Queue (blk-mq)..."
+            sed -i '/CONFIG_SCSI_MQ_DEFAULT/d' "$DEFCONFIG_FILE"
+            echo "CONFIG_SCSI_MQ_DEFAULT=y" >> "$DEFCONFIG_FILE"
 
-      - name: 🧠 Optimize VM, zRAM & Mali-G76 Smoothness
-        shell: bash
-        run: |
-            cd $GITHUB_WORKSPACE/device_kernel
-            
-            echo "[+] Optimizing Virtual Memory (VM) and Swap..."
-            
-            # 1.
-            find mm -name "vmscan.c" -exec sed -i 's/int vm_vfs_cache_pressure = 100;/int vm_vfs_cache_pressure = 50;/g' {} +
-            
-            # 2. page-cluster:
-            find mm -name "swap.c" -exec sed -i 's/int page_cluster;/int page_cluster = 0;/g' {} +
-            
-            echo "[+] Optimizing Mali GPU Idle Timers..."
-            
-            # 3. GPU Autosuspend Delay
-            find drivers/gpu/arm/ -type f -name "mali_kbase_core_linux.c" -exec sed -i 's/KBASE_DEFAULT_RUNTIME_PM_AUTOSUSPEND_DELAY 50/KBASE_DEFAULT_RUNTIME_PM_AUTOSUSPEND_DELAY 250/g' {} +
-            find drivers/gpu/arm/ -type f -name "mali_kbase_core_linux.c" -exec sed -i 's/autosuspend_delay_ms = 50;/autosuspend_delay_ms = 250;/g' {} +
-            
-            echo "[+] VM and GPU tweaks applied successfully."
-          
       - name: 🔒 Patch Kernel of Baseband Guard
         uses: ./.github/workflows/patch-baseband-guard
 
