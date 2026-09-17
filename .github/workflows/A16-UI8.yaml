@@ -240,7 +240,7 @@ jobs:
             git clone --depth=1 https://github.com/soranerai/vpnhide_next_backend.git /tmp/vpnhide_next_backend
             
             echo "[+] Forcing modern UDP macros for Samsung backports..."
-            cat << 'EOF' >> /tmp/vpnhide_next_backend/include/linux/vpnhide.h
+            cat << 'EOF' >> /tmp/vpnhide_next_backend/kpatch/include/linux/vpnhide.h
             #ifndef UDP_SEGMENT
             #define UDP_SEGMENT 103
             #endif
