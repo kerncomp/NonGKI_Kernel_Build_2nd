@@ -227,7 +227,7 @@ jobs:
           echo "CONFIG_NOMOUNT=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           echo "[+] NoMount integration completed."
 
-      - name: 🕵️ Integrate VPNHide Next (Exynos Modern Hybrid)
+      - name: 🕵️ Integrate VPNHide Next (4.14)
         shell: bash
         run: |
             set -x
@@ -236,17 +236,18 @@ jobs:
             rm -rf /tmp/vpnhide_next_backend
             git clone --depth=1 https://github.com/soranerai/vpnhide_next_backend.git /tmp/vpnhide_next_backend
             
-            echo "[+] Modifying apply.sh for Exynos..."
-            sed -i 's/android17-6.18)/android17-6.18|exynos-4.14)/g' /tmp/vpnhide_next_backend/kpatch/scripts/apply.sh
-            
-            echo "[+] Safely patching inject_modern.py..."
-            # Atlatma kodunu sadece insert_in_function imzasının altına (eşsiz marker satırına) ekliyoruz.
-            # Bu sayede ensure_include gibi fonksiyonlara bulaşmadan sadece hedefi hackliyoruz.
-            sed -i '/marker: str | None = None) -> None:/a\    if function == "bpf_map_do_batch": return' /tmp/vpnhide_next_backend/kpatch/scripts/inject_modern.py
+            echo "[+] Fixing strict anchor in inject_legacy.py for Exynos..."
+            cat << 'EOF' > fix_legacy.py
+            path = "/tmp/vpnhide_next_backend/kpatch/scripts/inject_legacy.py"
+            with open(path, "r") as f: text = f.read()
+            text = text.replace("\"\\tseq_printf(seq, \\\"%pi6 %02x \\\", &rt->rt6i_dst.addr, rt->rt6i_dst.plen);\"", "\"%pi6 %02x \"")
+            with open(path, "w") as f: f.write(text)
+            EOF
+            python3 fix_legacy.py
             
             echo "[+] Running apply.sh..."
             chmod +x /tmp/vpnhide_next_backend/kpatch/scripts/apply.sh
-            /tmp/vpnhide_next_backend/kpatch/scripts/apply.sh "$GITHUB_WORKSPACE/device_kernel" exynos-4.14
+            /tmp/vpnhide_next_backend/kpatch/scripts/apply.sh "$GITHUB_WORKSPACE/device_kernel" upstream-4.14
             
             echo "[+] Updating defconfig..."
             DEFCONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
