@@ -227,7 +227,7 @@ jobs:
           echo "CONFIG_NOMOUNT=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           echo "[+] NoMount integration completed."
 
-      - name: 🕵️ Integrate VPNHide Next (4.14)
+      - name: 🕵️ Integrate VPNHide Next (Legacy Android 4.14)
         shell: bash
         run: |
             set -x
@@ -236,12 +236,17 @@ jobs:
             rm -rf /tmp/vpnhide_next_backend
             git clone --depth=1 https://github.com/soranerai/vpnhide_next_backend.git /tmp/vpnhide_next_backend
             
-            echo "[+] Fixing strict anchor in inject_legacy.py for Exynos..."
+            echo "[+] Fixing strict anchors and match count rules for Exynos..."
             cat << 'EOF' > fix_legacy.py
-            path = "/tmp/vpnhide_next_backend/kpatch/scripts/inject_legacy.py"
-            with open(path, "r") as f: text = f.read()
+            path_legacy = "/tmp/vpnhide_next_backend/kpatch/scripts/inject_legacy.py"
+            with open(path_legacy, "r") as f: text = f.read()
             text = text.replace("\"\\tseq_printf(seq, \\\"%pi6 %02x \\\", &rt->rt6i_dst.addr, rt->rt6i_dst.plen);\"", "\"%pi6 %02x \"")
-            with open(path, "w") as f: f.write(text)
+            with open(path_legacy, "w") as f: f.write(text)
+            
+            path_modern = "/tmp/vpnhide_next_backend/kpatch/scripts/inject_modern.py"
+            with open(path_modern, "r") as f: text = f.read()
+            text = text.replace("if count != 1:", "if count == 0:")
+            with open(path_modern, "w") as f: f.write(text)
             EOF
             python3 fix_legacy.py
             
