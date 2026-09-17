@@ -226,6 +226,25 @@ jobs:
           # Add NoMount config to defconfig
           echo "CONFIG_NOMOUNT=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           echo "[+] NoMount integration completed."
+
+      - name: 🛡️ Integrate VPNHide Next (kpatch)
+        shell: bash
+        run: |
+            echo "[+] Cloning VPNHide Next repository..."
+            cd $GITHUB_WORKSPACE
+            git clone https://github.com/soranerai/vpnhide_next_backend.git vpnhide_src
+            
+            echo "[+] Applying VPNHide kpatch to kernel tree (android-4.14 profile)..."
+            cd vpnhide_src
+            # apply.sh <kernel_dizini> <profil>
+            ./kpatch/scripts/apply.sh $GITHUB_WORKSPACE/device_kernel android-4.14
+            
+            echo "[+] Enabling CONFIG_VPNHIDE in defconfig..."
+            DEFCONFIG_FILE="$GITHUB_WORKSPACE/device_kernel/arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+            sed -i '/CONFIG_VPNHIDE/d' "$DEFCONFIG_FILE"
+            echo "CONFIG_VPNHIDE=y" >> "$DEFCONFIG_FILE"
+            
+            echo "[+] VPNHide static integration completed successfully."
           
       - name: 🧰 Patch Kernel of Re:Kernel
         if: env.REKERNEL_ENABLE == 'true'
