@@ -245,6 +245,10 @@ jobs:
               exit 1
             fi
 
+            echo "[+] Fixing Exynos variable names for strict injector..."
+            sed -i 's/rt6i_dst/fib6_dst/g' /tmp/vpnhide_next_backend/kpatch/scripts/inject_legacy.py
+            sed -i 's/rt->dst.dev/rt->fib6_nh.nh_dev/g' /tmp/vpnhide_next_backend/kpatch/scripts/inject_legacy.py
+
             echo "[+] Kernel ağacının temiz olduğu varsayılıyor (apply.sh bunu şart koşuyor)."
             chmod +x /tmp/vpnhide_next_backend/kpatch/scripts/apply.sh
 
