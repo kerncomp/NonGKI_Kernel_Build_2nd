@@ -239,10 +239,22 @@ jobs:
             rm -rf /tmp/vpnhide_next_backend
             git clone --depth=1 https://github.com/soranerai/vpnhide_next_backend.git /tmp/vpnhide_next_backend
             
-            echo "[+] Fixing Exynos variable names in inject_legacy.py..."
-            sed -i 's/rt6i_dst/fib6_dst/g' /tmp/vpnhide_next_backend/kpatch/scripts/inject_legacy.py
+            echo "[+] Forcing modern UDP macros for Samsung backports..."
+            cat << 'EOF' >> /tmp/vpnhide_next_backend/include/linux/vpnhide.h
+            #ifndef UDP_SEGMENT
+            #define UDP_SEGMENT 103
+            #endif
+            EOF
             
-            sed -i 's/rt->dst.dev/rt->fib6_nh.nh_dev/g' /tmp/vpnhide_next_backend/kpatch/scripts/inject_legacy.py
+            echo "[+] Fixing strict anchors and struct names for Exynos..."
+            cat << 'EOF' > fix_legacy.py
+            path = "/tmp/vpnhide_next_backend/kpatch/scripts/inject_legacy.py"
+            with open(path, "r") as f: text = f.read()
+            text = text.replace("\"\\tseq_printf(seq, \\\"%pi6 %02x \\\", &rt->rt6i_dst.addr, rt->rt6i_dst.plen);\"", "\"%pi6 %02x \"")
+            text = text.replace("rt->dst.dev", "rt->fib6_nh.nh_dev")
+            with open(path, "w") as f: f.write(text)
+            EOF
+            python3 fix_legacy.py
             
             echo "[+] Running apply.sh..."
             chmod +x /tmp/vpnhide_next_backend/kpatch/scripts/apply.sh
