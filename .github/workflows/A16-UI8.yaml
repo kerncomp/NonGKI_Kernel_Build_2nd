@@ -242,6 +242,8 @@ jobs:
             echo "[+] Fixing Exynos variable names in inject_legacy.py..."
             sed -i 's/rt6i_dst/fib6_dst/g' /tmp/vpnhide_next_backend/kpatch/scripts/inject_legacy.py
             
+            sed -i 's/rt->dst.dev/rt->fib6_nh.fib_nh_dev/g' /tmp/vpnhide_next_backend/kpatch/scripts/inject_legacy.py
+            
             echo "[+] Running apply.sh..."
             chmod +x /tmp/vpnhide_next_backend/kpatch/scripts/apply.sh
             /tmp/vpnhide_next_backend/kpatch/scripts/apply.sh "$GITHUB_WORKSPACE/device_kernel" upstream-4.14
@@ -252,7 +254,6 @@ jobs:
             echo "CONFIG_VPNHIDE=y" >> "$DEFCONFIG_FILE"
             
             echo "[+] VPNHide Next integrated successfully."
-            
       - name: 🧰 Patch Kernel of Re:Kernel
         if: env.REKERNEL_ENABLE == 'true'
         uses: ./.github/workflows/patch-rekernel
