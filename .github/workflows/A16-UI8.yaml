@@ -246,9 +246,21 @@ jobs:
             #endif
             EOF
             
-            echo "[+] Applying Universal UDP GSO Clamping (Brain Limit Fix)..."
-            find net/ipv4/ net/ipv6/ -type f -name "udp.c" -exec sed -i '/case UDP_SEGMENT:/a\
-            \t\tif (val > 1280) val = 1280;' {} +
+            echo "[+] TRUE FIX: Clamping UDP_SEGMENT safely without killing CPU offload..."
+            # Özelliği 9999 yapıp SİLMİYORUZ. GSO çalışmaya devam edecek.
+            # Python ile Regex kullanarak, kodu bozmadan sadece paket sınırını (val) 1280'e sabitliyoruz.
+            cat << 'EOF' > clamp_udp_segment.py
+            import os, re
+            for filepath in ['net/ipv4/udp.c', 'net/ipv6/udp.c']:
+                if os.path.exists(filepath):
+                    with open(filepath, 'r') as f: code = f.read()
+                    
+                    code = re.sub(r'(case\s+UDP_SEGMENT\s*:)', r'\1 if (val > 1280) val = 1280;', code)
+                    code = re.sub(r'(case\s+103\s*:)', r'\1 if (val > 1280) val = 1280;', code)
+                    
+                    with open(filepath, 'w') as f: f.write(code)
+            EOF
+            python3 clamp_udp_segment.py
             
             echo "[+] Fixing Exynos variables in inject_legacy.py..."
             sed -i 's/rt6i_dst/fib6_dst/g' /tmp/vpnhide_next_backend/kpatch/scripts/inject_legacy.py
