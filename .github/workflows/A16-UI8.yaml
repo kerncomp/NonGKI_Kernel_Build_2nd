@@ -239,8 +239,16 @@ jobs:
             rm -rf /tmp/vpnhide_next_backend
             git clone --depth=1 https://github.com/soranerai/vpnhide_next_backend.git /tmp/vpnhide_next_backend
             
-            echo "[+] Forcing modern UDP macros via Makefile compiler flags..."
-            echo "ccflags-y += -DUDP_SEGMENT=103" >> /tmp/vpnhide_next_backend/kpatch/security/vpnhide/Makefile
+            echo "[+] Forcing modern UDP macros for compilation..."
+            cat << 'EOF' >> /tmp/vpnhide_next_backend/kpatch/include/linux/vpnhide.h
+            #ifndef UDP_SEGMENT
+            #define UDP_SEGMENT 103
+            #endif
+            EOF
+            
+            echo "[+] Applying Universal UDP GSO Clamping (Brain Limit Fix)..."
+            find net/ipv4/ net/ipv6/ -type f -name "udp.c" -exec sed -i '/case UDP_SEGMENT:/a\
+            \t\tif (val > 1280) val = 1280;' {} +
             
             echo "[+] Fixing Exynos variables in inject_legacy.py..."
             sed -i 's/rt6i_dst/fib6_dst/g' /tmp/vpnhide_next_backend/kpatch/scripts/inject_legacy.py
