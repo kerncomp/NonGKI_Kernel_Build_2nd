@@ -239,19 +239,11 @@ jobs:
             rm -rf /tmp/vpnhide_next_backend
             git clone --depth=1 https://github.com/soranerai/vpnhide_next_backend.git /tmp/vpnhide_next_backend
             
-            echo "[+] Forcing modern UDP macros for Samsung backports..."
-            cat << 'EOF' >> /tmp/vpnhide_next_backend/kpatch/include/linux/vpnhide.h
-            #ifndef UDP_SEGMENT
-            #define UDP_SEGMENT 103
-            #endif
-            EOF
+            echo "[+] Forcing modern UDP macros via Makefile compiler flags..."
+            echo "ccflags-y += -DUDP_SEGMENT=103" >> /tmp/vpnhide_next_backend/kpatch/security/vpnhide/Makefile
             
             echo "[+] Fixing Exynos variables in inject_legacy.py..."
-            # 1. Çapa Düzeltmesi: Python'un arayacağı satırı Exynos'a uyarlıyoruz (fib6_dst).
-            # Bu sayede "found 2" hatası vermeden nokta atışı tek hedefi bulacak.
             sed -i 's/rt6i_dst/fib6_dst/g' /tmp/vpnhide_next_backend/kpatch/scripts/inject_legacy.py
-            
-            # 2. C Kodu Düzeltmesi: Enjekte edilecek değişkene Samsung'un nh_dev adını veriyoruz.
             sed -i 's/rt->dst.dev/rt->fib6_nh.nh_dev/g' /tmp/vpnhide_next_backend/kpatch/scripts/inject_legacy.py
             
             echo "[+] Running apply.sh..."
@@ -378,49 +370,12 @@ jobs:
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
           
-      - name: 🧷 Setup KPatch-Next tools
-        shell: bash
-        run: |
-          cd $GITHUB_WORKSPACE/device_kernel
-          KPATCH_VER=$(curl -s https://api.github.com/repos/KernelSU-Next/KPatch-Next/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
-          echo "[+] KPatch-Next version: $KPATCH_VER"
-          echo "KPATCH_VER=$KPATCH_VER" >> $GITHUB_ENV
-          curl -Lo kptools https://github.com/KernelSU-Next/KPatch-Next/releases/download/${KPATCH_VER}/kptools-linux
-          curl -Lo kpimg https://github.com/KernelSU-Next/KPatch-Next/releases/download/${KPATCH_VER}/kpimg-linux
-          curl -Lo kpatch-android https://github.com/KernelSU-Next/KPatch-Next/releases/download/${KPATCH_VER}/kpatch-android
-          chmod +x kptools kpimg kpatch-android
-          ./kptools --version || true
-          
-      - name: 🩹 Patch Kernel Image with KPatch-Next
-        shell: bash
-        run: |
-          cd $GITHUB_WORKSPACE/device_kernel
-          IMAGE=out/arch/arm64/boot/Image
-          PATCHED_IMAGE=out/arch/arm64/boot/Image.kp
-          if [ ! -f "$IMAGE" ]; then
-            echo "[-] Kernel Image not found ($IMAGE), skipping KPatch."
-            exit 0
-          fi
-          ./kptools -i "$IMAGE" -l || true
-          ./kptools -p -i "$IMAGE" -k ./kpimg -o "$PATCHED_IMAGE"
-          echo "KPATCH_PATCHED=true" >> $GITHUB_ENV
-          echo "[+] Kernel Image patched with KPatch-Next: $PATCHED_IMAGE"
-          
-      - name: 📝 Save build metadata
-        shell: bash
-        run: |
-          cd $GITHUB_WORKSPACE/device_kernel
-          mkdir -p build/out/meta
-          {
-            echo "KPatch-Next Version: $KPATCH_VER"
-          } > build/out/meta/build-info.txt
-          echo "[+] build-info.txt created."
-          
       - name: ❗ Samsung Kernel Pack Process
         shell: bash
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          
+
+          # Var
           TIME=$(date +"%Y%m%d%H%M%S")
           KERNEL_PATH=build/out/d2s/Image
           KERNEL_OFFSET=0x00008000
@@ -437,51 +392,36 @@ jobs:
           RAMDISK=build/out/d2s/ramdisk.cpio.gz
           OUTPUT_FILE=build/out/d2s/boot.img
           BOARD=SRPSC14B009KU
-          
+
           mkdir -p build/out/d2s/zip/files
           mkdir -p build/out/d2s/zip/META-INF/com/google/android
-          
-          # Include kpatch-android tool in package if KPatch-Next is used
-          if [ -f out/arch/arm64/boot/Image.kp ]; then
-            cp -f out/arch/arm64/boot/Image.kp build/out/d2s/Image
-            echo "[+] Using kernel image patched with KPatch-Next."
-          else
-            cp -f out/arch/arm64/boot/Image build/out/d2s/Image
-          fi
-          
+
+          cp -f out/arch/arm64/boot/Image build/out/d2s/Image
+
           ./toolchain/mkdtimg cfg_create build/out/d2s/dtb.img build/dtconfigs/exynos9825.cfg -d out/arch/arm64/boot/dts/exynos
           ./toolchain/mkdtimg cfg_create build/out/d2s/dtbo.img build/dtconfigs/d2s.cfg -d out/arch/arm64/boot/dts/samsung
-          
+
           pushd build/ramdisk > /dev/null
           find . ! -name . | LC_ALL=C sort | cpio -o -H newc -R root:root | gzip > ../out/d2s/ramdisk.cpio.gz || abort
           popd > /dev/null
-          
+
           ./toolchain/mkbootimg --base $BASE --board $BOARD --cmdline "$CMDLINE" --hashtype $HASHTYPE --header_version $HEADER_VERSION --kernel $KERNEL_PATH --kernel_offset $KERNEL_OFFSET --os_patch_level $OS_PATCH_LEVEL --os_version $OS_VERSION --pagesize $PAGESIZE --ramdisk $RAMDISK --ramdisk_offset $RAMDISK_OFFSET --second_offset $SECOND_OFFSET --tags_offset $TAGS_OFFSET -o $OUTPUT_FILE
-          
+
           cp build/out/d2s/boot.img build/out/d2s/zip/files/boot.img
           cp build/out/d2s/dtb.img build/out/d2s/zip/files/dtb.img
           cp build/out/d2s/dtbo.img build/out/d2s/zip/files/dtbo.img
           cp build/update-binary build/out/d2s/zip/META-INF/com/google/android/update-binary
           cp build/updater-script build/out/d2s/zip/META-INF/com/google/android/updater-script
-          
-          if [ -f kpatch-android ]; then
-            cp kpatch-android build/out/d2s/zip/files/kpatch-android
-          fi
-          
-          # Add KPatch-Next build metadata file to zip root
-          if [ -f build/out/meta/build-info.txt ]; then
-            cp build/out/meta/build-info.txt build/out/d2s/zip/build-info.txt
-            echo "[+] build-info.txt added to zip package."
-          fi
-          
+
           mkdir tmp
           cp -rp ./build/out/d2s/zip/* tmp
           cd tmp
-          zip -r9 tmp.zip *
+          7za a -mx9 tmp.zip *
           cd ..
           cp -fp tmp/tmp.zip ${{ env.DEVICE_CODENAME }}-${{ env.ROM_TEXT }}-$TIME-${{ env.PACK_METHOD }}.zip
           rm -rf tmp
+
           echo "PACK_NAME=${{ env.DEVICE_CODENAME }}-${{ env.ROM_TEXT }}-$TIME-${{ env.PACK_METHOD }}.zip" >> $GITHUB_ENV
-          
+
       - name: ✏️ Upload Artifacts
         uses: ./.github/workflows/upload-files
