@@ -240,9 +240,11 @@ jobs:
             git clone --depth=1 https://github.com/soranerai/vpnhide_next_backend.git /tmp/vpnhide_next_backend
             
             echo "[+] Fixing Exynos variable names in inject_legacy.py..."
+            # 1. Anchor fix: Orijinal rt6i_dst çapasını Exynos'un fib6_dst çapasına çeviriyoruz.
             sed -i 's/rt6i_dst/fib6_dst/g' /tmp/vpnhide_next_backend/kpatch/scripts/inject_legacy.py
             
-            sed -i 's/rt->dst.dev/rt->fib6_nh.fib_nh_dev/g' /tmp/vpnhide_next_backend/kpatch/scripts/inject_legacy.py
+            # 2. Struct fix: Cihaz değişkenini Samsung'un kullandığı nh_dev yapısına uyarlıyoruz.
+            sed -i 's/rt->dst.dev/rt->fib6_nh.nh_dev/g' /tmp/vpnhide_next_backend/kpatch/scripts/inject_legacy.py
             
             echo "[+] Running apply.sh..."
             chmod +x /tmp/vpnhide_next_backend/kpatch/scripts/apply.sh
@@ -254,6 +256,7 @@ jobs:
             echo "CONFIG_VPNHIDE=y" >> "$DEFCONFIG_FILE"
             
             echo "[+] VPNHide Next integrated successfully."
+            
       - name: 🧰 Patch Kernel of Re:Kernel
         if: env.REKERNEL_ENABLE == 'true'
         uses: ./.github/workflows/patch-rekernel
