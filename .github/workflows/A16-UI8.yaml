@@ -246,15 +246,13 @@ jobs:
             #endif
             EOF
             
-            echo "[+] Fixing strict anchors and struct names for Exynos..."
-            cat << 'EOF' > fix_legacy.py
-            path = "/tmp/vpnhide_next_backend/kpatch/scripts/inject_legacy.py"
-            with open(path, "r") as f: text = f.read()
-            text = text.replace("\"\\tseq_printf(seq, \\\"%pi6 %02x \\\", &rt->rt6i_dst.addr, rt->rt6i_dst.plen);\"", "\"%pi6 %02x \"")
-            text = text.replace("rt->dst.dev", "rt->fib6_nh.nh_dev")
-            with open(path, "w") as f: f.write(text)
-            EOF
-            python3 fix_legacy.py
+            echo "[+] Fixing Exynos variables in inject_legacy.py..."
+            # 1. Çapa Düzeltmesi: Python'un arayacağı satırı Exynos'a uyarlıyoruz (fib6_dst).
+            # Bu sayede "found 2" hatası vermeden nokta atışı tek hedefi bulacak.
+            sed -i 's/rt6i_dst/fib6_dst/g' /tmp/vpnhide_next_backend/kpatch/scripts/inject_legacy.py
+            
+            # 2. C Kodu Düzeltmesi: Enjekte edilecek değişkene Samsung'un nh_dev adını veriyoruz.
+            sed -i 's/rt->dst.dev/rt->fib6_nh.nh_dev/g' /tmp/vpnhide_next_backend/kpatch/scripts/inject_legacy.py
             
             echo "[+] Running apply.sh..."
             chmod +x /tmp/vpnhide_next_backend/kpatch/scripts/apply.sh
