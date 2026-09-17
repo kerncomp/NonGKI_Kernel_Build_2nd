@@ -234,20 +234,15 @@ jobs:
             cd $GITHUB_WORKSPACE
             git clone https://github.com/soranerai/vpnhide_next_backend.git vpnhide_src
             
-            echo "[+] Manually copying VPNHide files (Bypassing apply.sh)..."
-            cp -r $GITHUB_WORKSPACE/vpnhide_src/kpatch/security/vpnhide $GITHUB_WORKSPACE/device_kernel/security/
-            cp $GITHUB_WORKSPACE/vpnhide_src/kpatch/include/linux/vpnhide.h $GITHUB_WORKSPACE/device_kernel/include/linux/
+            echo "[+] Applying VPNHide kpatch to kernel tree (upstream-4.14 profile)..."
+            cd vpnhide_src
             
-            echo "[+] Running inject_modern.py directly..."
-            cd $GITHUB_WORKSPACE/vpnhide_src
-            python3 kpatch/scripts/inject_modern.py $GITHUB_WORKSPACE/device_kernel
+            ./kpatch/scripts/apply.sh $GITHUB_WORKSPACE/device_kernel upstream-4.14
             
             echo "[+] Enabling CONFIG_VPNHIDE in defconfig..."
             DEFCONFIG_FILE="$GITHUB_WORKSPACE/device_kernel/arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
             sed -i '/CONFIG_VPNHIDE/d' "$DEFCONFIG_FILE"
             echo "CONFIG_VPNHIDE=y" >> "$DEFCONFIG_FILE"
-            
-            echo "[+] VPNHide static integration completed successfully."
             
             echo "[+] VPNHide static integration completed successfully."
           
