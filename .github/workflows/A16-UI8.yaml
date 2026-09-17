@@ -227,24 +227,34 @@ jobs:
           echo "CONFIG_NOMOUNT=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           echo "[+] NoMount integration completed."
 
-      - name: 🛡️ Integrate VPNHide Next (kpatch)
+      - name: 🕵️ Integrate VPNHide Next (kpatch, android-4.14 profile)
         shell: bash
         run: |
-            echo "[+] Cloning VPNHide Next repository..."
-            cd $GITHUB_WORKSPACE
-            git clone https://github.com/soranerai/vpnhide_next_backend.git vpnhide_src
-            
-            echo "[+] Applying VPNHide kpatch to kernel tree (upstream-4.14 profile)..."
-            cd vpnhide_src
-            
-            ./kpatch/scripts/apply.sh $GITHUB_WORKSPACE/device_kernel upstream-4.14
-            
-            echo "[+] Enabling CONFIG_VPNHIDE in defconfig..."
-            DEFCONFIG_FILE="$GITHUB_WORKSPACE/device_kernel/arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+            set -x
+            cd $GITHUB_WORKSPACE/device_kernel
+
+            echo "[+] VPNHide Next backend repo..."
+            rm -rf /tmp/vpnhide_next_backend
+            git clone --depth=1 https://github.com/soranerai/vpnhide_next_backend.git /tmp/vpnhide_next_backend
+
+            if [ ! -f /tmp/vpnhide_next_backend/kpatch/scripts/apply.sh ]; then
+              echo "[-] error"
+              exit 1
+            fi
+
+            echo "[+] apply.sh... "
+            chmod +x /tmp/vpnhide_next_backend/kpatch/scripts/apply.sh
+
+            /tmp/vpnhide_next_backend/kpatch/scripts/apply.sh \
+              "$GITHUB_WORKSPACE/device_kernel" \
+              upstream-4.14
+
+            echo "[+] done..."
+            DEFCONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
             sed -i '/CONFIG_VPNHIDE/d' "$DEFCONFIG_FILE"
             echo "CONFIG_VPNHIDE=y" >> "$DEFCONFIG_FILE"
-            
-            echo "[+] VPNHide static integration completed successfully."
+
+            echo "[+] VPNHide Next (kpatch/android-4.14) ."
           
       - name: 🧰 Patch Kernel of Re:Kernel
         if: env.REKERNEL_ENABLE == 'true'
