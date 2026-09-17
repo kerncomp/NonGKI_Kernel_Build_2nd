@@ -227,34 +227,31 @@ jobs:
           echo "CONFIG_NOMOUNT=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           echo "[+] NoMount integration completed."
 
-      - name: 🕵️ Integrate VPNHide Next (kpatch, android-4.14 profile)
+      - name: 🕵️ Integrate VPNHide Next (Exynos Modern Hybrid)
         shell: bash
         run: |
             set -x
             cd $GITHUB_WORKSPACE/device_kernel
-
             echo "[+] VPNHide Next backend repo..."
             rm -rf /tmp/vpnhide_next_backend
-            git clone --depth=1 https://github.com/soranerai/vpnhide_next_backend.git /tmp/vpnhide_next_backend
-
-            if [ ! -f /tmp/vpnhide_next_backend/kpatch/scripts/apply.sh ]; then
-              echo "[-] error"
-              exit 1
-            fi
-
-            echo "[+] apply.sh... "
+            git clone https://github.com/soranerai/vpnhide_next_backend.git /tmp/vpnhide_next_backend
+            
+            echo "[+] Modifying apply.sh for Exynos..."
+            sed -i 's/android17-6.18)/android17-6.18|exynos-4.14)/g' /tmp/vpnhide_next_backend/kpatch/scripts/apply.sh
+            
+            echo "[+] Patching inject_modern.py to skip 5.6+ BPF batch API..."
+            sed -i '/bpf_map_do_batch/,/marker="vpnhide_bpf_lookup_batch"/d' /tmp/vpnhide_next_backend/kpatch/scripts/inject_modern.py
+            
+            echo "[+] Running apply.sh..."
             chmod +x /tmp/vpnhide_next_backend/kpatch/scripts/apply.sh
-
-            /tmp/vpnhide_next_backend/kpatch/scripts/apply.sh \
-              "$GITHUB_WORKSPACE/device_kernel" \
-              upstream-4.14
-
-            echo "[+] done..."
+            /tmp/vpnhide_next_backend/kpatch/scripts/apply.sh "$GITHUB_WORKSPACE/device_kernel" exynos-4.14
+            
+            echo "[+] Updating defconfig..."
             DEFCONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
             sed -i '/CONFIG_VPNHIDE/d' "$DEFCONFIG_FILE"
             echo "CONFIG_VPNHIDE=y" >> "$DEFCONFIG_FILE"
-
-            echo "[+] VPNHide Next (kpatch/android-4.14) ."
+            
+            echo "[+] VPNHide Next integrated successfully."
           
       - name: 🧰 Patch Kernel of Re:Kernel
         if: env.REKERNEL_ENABLE == 'true'
