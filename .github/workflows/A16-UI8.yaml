@@ -230,38 +230,63 @@ jobs:
           echo "CONFIG_NOMOUNT=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           echo "[+] NoMount integration completed."
 
-      - name: 🕵️ Integrate VPNHide Next (kpatch, android-4.14 profile)
+      - name: 🕵️ Integrate VPNHide Next (kpatch, upstream-4.14 profile)
         shell: bash
         run: |
             set -x
             cd $GITHUB_WORKSPACE/device_kernel
 
-            echo "[+] VPNHide Next backend repo klonlanıyor..."
+            echo "[+] VPNHide Next backend repo cloning..."
             rm -rf /tmp/vpnhide_next_backend
             git clone --depth=1 https://github.com/soranerai/vpnhide_next_backend.git /tmp/vpnhide_next_backend
 
             if [ ! -f /tmp/vpnhide_next_backend/kpatch/scripts/apply.sh ]; then
-              echo "[-] KRİTİK HATA: apply.sh bulunamadı, repo yapısı değişmiş olabilir."
+              echo "[-] error: apply.sh not founded. "
               exit 1
             fi
 
-            echo "[+] Fixing Exynos variable names for strict injector..."
-            sed -i 's/rt6i_dst/fib6_dst/g' /tmp/vpnhide_next_backend/kpatch/scripts/inject_legacy.py
-            sed -i 's/rt->dst.dev/rt->fib6_nh.nh_dev/g' /tmp/vpnhide_next_backend/kpatch/scripts/inject_legacy.py
-
-            echo "[+] Kernel ağacının temiz olduğu varsayılıyor (apply.sh bunu şart koşuyor)."
+            echo "[+] Kernel tree cleaned."
             chmod +x /tmp/vpnhide_next_backend/kpatch/scripts/apply.sh
 
             /tmp/vpnhide_next_backend/kpatch/scripts/apply.sh \
               "$GITHUB_WORKSPACE/device_kernel" \
               upstream-4.14
 
-            echo "[+] VPNHide entegrasyonu tamamlandı, CONFIG_VPNHIDE=y defconfig'e ekleniyor..."
+            echo "[+] VPNHide done, CONFIG_VPNHIDE=y ..."
             DEFCONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
             sed -i '/CONFIG_VPNHIDE/d' "$DEFCONFIG_FILE"
             echo "CONFIG_VPNHIDE=y" >> "$DEFCONFIG_FILE"
 
-            echo "[+] VPNHide Next (kpatch/android-4.14) entegrasyonu tamamlandı."
+            echo "[+] UDP_SEGMENT (4.18 -> 4.14) ..."
+            HOOK_SOCKET_FILE=""
+            for CAND in security/vpnhide/hook_socket.c kernel/vpnhide/hook_socket.c; do
+              if [ -f "$CAND" ]; then
+                HOOK_SOCKET_FILE="$CAND"
+                break
+              fi
+            done
+            if [ -z "$HOOK_SOCKET_FILE" ]; then
+              echo "[!] hook_socket.c ..."
+              HOOK_SOCKET_FILE=$(find . -name "hook_socket.c" -not -path "*/\.*" 2>/dev/null | head -n 1)
+            fi
+
+            if [ -n "$HOOK_SOCKET_FILE" ] && [ -f "$HOOK_SOCKET_FILE" ]; then
+              echo "[+] Bulunan dosya: $HOOK_SOCKET_FILE"
+              grep -n "LINUX_VERSION_CODE >= KERNEL_VERSION(4, 18, 0)" "$HOOK_SOCKET_FILE" || echo "[!] WARNING "
+              sed -i 's/#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 18, 0)/#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)/' "$HOOK_SOCKET_FILE"
+              if grep -q "KERNEL_VERSION(4, 14, 0)" "$HOOK_SOCKET_FILE"; then
+                echo "[+] UDP_SEGMENT 4.14.0 ."
+              else
+                echo "[!] WARNING ."
+              fi
+            else
+              echo "[-] WARNING2 "
+              echo "    true way "
+              echo "    update way:"
+              find . -iname "*vpnhide*" 2>/dev/null
+            fi
+
+            echo "[+] VPNHide Next (kpatch/upstream-4.14) ."
             
       - name: 🧰 Patch Kernel of Re:Kernel
         if: env.REKERNEL_ENABLE == 'true'
